@@ -1,20 +1,17 @@
 // Mood detection content script
 class KickMoodMeter {
   constructor() {
-    // Predefined sentiment dictionaries
-    this.positiveWords = [
-      'pog', 'poggers', 'pogchamp', 'based', 'W', 'fire', 'sick', 
-      'amazing', 'awesome', 'epic', 'great', 'love', 'hype', 
-      'legendary', 'insane', 'incredible', 'nice', 'awesome', 
-      'fantastic', 'woohoo', 'yes', 'good', 'best', 'perfect'
-    ];
-
-    this.negativeWords = [
-      'L', 'trash', 'bad', 'worst', 'cringe', 'fail', 'terrible', 
-      'awful', 'stupid', 'dumb', 'sad', 'mad', 'angry', 'hate', 
-      'boring', 'meh', 'garbage', 'terrible', 'wtf', 'bruh', 'no'
-    ];
-
+    // Will be populated from CSV
+    this.sentimentLabels = {
+      'label_0': 'negative',
+      'label_1': 'neutral',
+      'label_2': 'positive'
+    };
+    
+    // Message history keyed by message text for quick lookup
+    this.messageToSentimentMap = new Map();
+    
+    // Keep the intensifiers from original implementation
     this.intensifiers = {
       'very': 2,
       'super': 2,
@@ -29,6 +26,7 @@ class KickMoodMeter {
     this.isCollecting = false;
     this.collectionStartTime = null;
     this.widgetCreated = false;
+    this.sentimentDataLoaded = false;
     this.settings = {
       transparency: 85,
       updateFrequency: 5  // Default is now 5 minutes
@@ -43,7 +41,138 @@ class KickMoodMeter {
       // Store the saved position
       this.savedPosition = data.widgetPosition || null;
     });
+    
+    // Load sentiment data from CSV
+    this.loadSentimentData();
   }
+  
+  async loadSentimentData() {
+    try {
+      console.log('Attempting to load sentiment data...');
+      const csvUrl = chrome.runtime.getURL('labeled_chat_messages.csv');
+      console.log('CSV URL:', csvUrl);
+      
+      const response = await fetch(csvUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch CSV: ${response.status} ${response.statusText}`);
+      }
+      
+      const csvText = await response.text();
+      console.log('CSV data received, length:', csvText.length);
+
+      this.sentimentDataLoaded = true;
+    } catch (error) {
+      console.error('Error loading sentiment data:', error);
+      // Fall back to the original dictionaries if CSV loading fails
+      // this.fallbackToOriginalDictionaries();
+    }
+  }
+  
+  parseSentimentCsv(csvText) {
+    try {
+      // More robust CSV parsing
+      // First check if we have data
+      if (!csvText || typeof csvText !== 'string') {
+        console.error('Invalid CSV text:', csvText);
+        return;
+      }
+      
+      // Split by lines and handle different line endings
+      const lines = csvText.split(/\r?\n/);
+      console.log(`CSV has ${lines.length} lines`);
+      
+      if (lines.length <= 1) {
+        console.error('CSV has too few lines');
+        return;
+      }
+      
+      // Validate header row
+      const header = lines[0].split(',');
+      const expectedColumns = ['time', 'user_name', 'user_color', 'message', 'sentiment'];
+      
+      // Check if header matches expected format
+      const isValidHeader = expectedColumns.every((col, index) => 
+        header[index] && header[index].trim().toLowerCase() === col.toLowerCase()
+      );
+      
+      if (!isValidHeader) {
+        console.warn('CSV header does not match expected format:', header);
+        console.warn('Expected:', expectedColumns);
+        // Continue anyway but log the issue
+      }
+      
+      // Track stats for debugging
+      let validLines = 0;
+      let invalidLines = 0;
+      
+      // Skip header row
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        // Handle potential quotes in the CSV more carefully
+        let columns = [];
+        let inQuotes = false;
+        let currentCol = '';
+        
+        for (let j = 0; j < line.length; j++) {
+          const char = line[j];
+          
+          if (char === '"' && (j === 0 || line[j-1] !== '\\')) {
+            inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            columns.push(currentCol);
+            currentCol = '';
+          } else {
+            currentCol += char;
+          }
+        }
+        
+        // Add the last column
+        columns.push(currentCol);
+        
+        // Verify we have enough columns
+        if (columns.length >= 5) {
+          // Extract message and sentiment label
+          const message = columns[3].toLowerCase().trim().replace(/^"|"$/g, '');
+          const sentiment = columns[4].trim().replace(/^"|"$/g, '');
+          
+          if (message && sentiment) {
+            // Store in our map for quick lookups
+            this.messageToSentimentMap.set(message, sentiment);
+            validLines++;
+          } else {
+            invalidLines++;
+          }
+        } else {
+          invalidLines++;
+          console.warn(`Invalid line ${i}: Insufficient columns`, line);
+        }
+      }
+      
+      console.log(`Loaded ${this.messageToSentimentMap.size} sentiment entries from CSV`);
+      console.log(`Valid lines: ${validLines}, Invalid lines: ${invalidLines}`);
+    } catch (error) {
+      console.error('Error parsing CSV:', error);
+    }
+  }
+  
+  // fallbackToOriginalDictionaries() {
+  //   console.log('Falling back to original dictionaries');
+  //   // Predefined sentiment dictionaries from original code
+  //   this.positiveWords = [
+  //     'pog', 'poggers', 'pogchamp', 'based', 'W', 'fire', 'sick', 
+  //     'amazing', 'awesome', 'epic', 'great', 'love', 'hype', 
+  //     'legendary', 'insane', 'incredible', 'nice', 'awesome', 
+  //     'fantastic', 'woohoo', 'yes', 'good', 'best', 'perfect'
+  //   ];
+
+  //   this.negativeWords = [
+  //     'L', 'trash', 'bad', 'worst', 'cringe', 'fail', 'terrible', 
+  //     'awful', 'stupid', 'dumb', 'sad', 'mad', 'angry', 'hate', 
+  //     'boring', 'meh', 'garbage', 'terrible', 'wtf', 'bruh', 'no'
+  //   ];
+  // }
 
   getChannelName() {
     // Extract channel name from URL
@@ -107,31 +236,50 @@ class KickMoodMeter {
     
     messages.forEach(message => {
       let messageScore = 0;
-      const words = message.message.split(/\s+/);
+      
+      // Check if we have a pre-labeled sentiment for this exact message
+      if (this.sentimentDataLoaded && this.messageToSentimentMap.has(message.message)) {
+        const sentimentLabel = this.messageToSentimentMap.get(message.message);
+        
+        // Convert label to score
+        if (sentimentLabel === 'label_2') {
+          messageScore = 1; // positive
+        } else if (sentimentLabel === 'label_0') {
+          messageScore = -1; // negative
+        } else {
+          messageScore = 0; // neutral (label_1)
+        }
+      } else {
+        // Fall back to the original word-based analysis if no exact match
+        const words = message.message.split(/\s+/);
 
-      words.forEach((word, index) => {
-        // Check for intensifiers
-        if (this.intensifiers[word]) {
-          // Look ahead to the next word and multiply its impact
-          const intensityMultiplier = this.intensifiers[word];
-          const nextWord = words[index + 1];
-          
-          if (this.positiveWords.includes(nextWord)) {
-            messageScore += 1 * intensityMultiplier;
+        words.forEach((word, index) => {
+          // Check for intensifiers
+          if (this.intensifiers[word]) {
+            // Look ahead to the next word and multiply its impact
+            const intensityMultiplier = this.intensifiers[word];
+            const nextWord = words[index + 1];
+            
+            if (this.sentimentDataLoaded) {
+              // We don't have word-level data in our CSV, so skip this with new approach
+            } else if (this.positiveWords && this.positiveWords.includes(nextWord)) {
+              messageScore += 1 * intensityMultiplier;
+            } else if (this.negativeWords && this.negativeWords.includes(nextWord)) {
+              messageScore -= 1 * intensityMultiplier;
+            }
           }
-          if (this.negativeWords.includes(nextWord)) {
-            messageScore -= 1 * intensityMultiplier;
-          }
-        }
 
-        // Direct word matching
-        if (this.positiveWords.includes(word)) {
-          messageScore += 1;
-        }
-        if (this.negativeWords.includes(word)) {
-          messageScore -= 1;
-        }
-      });
+          // Direct word matching for fallback mode
+          if (!this.sentimentDataLoaded) {
+            if (this.positiveWords && this.positiveWords.includes(word)) {
+              messageScore += 1;
+            }
+            if (this.negativeWords && this.negativeWords.includes(word)) {
+              messageScore -= 1;
+            }
+          }
+        });
+      }
 
       sentimentScore += messageScore;
       
@@ -667,6 +815,11 @@ class KickMoodMeter {
     widget.style.display = 'block';
     widget.style.opacity = '1';
   }
+  
+
+
+
+
   
   toggleWidget() {
     const widget = document.getElementById('kick-mood-widget');

@@ -26,7 +26,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["Mood_Meter.png"],
+      "resources": ["Mood_Meter.png", "labeled_chat_messages.csv"],
       "matches": ["*://*.kick.com/*"]
     }
   ]
