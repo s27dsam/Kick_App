@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Kick Mood Meter</title>
+  <style>
+    body {
+      width: 280px;
+      padding: 12px;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background-color: #1e1e1e;
+      color: #f0f0f0;
+    }
+    
+    h1 {
+      text-align: center;
+      font-size: 20px;
+      margin-top: 5px;
+      margin-bottom: 15px;
+      color: #ffffff;
+    }
+    
+    .button-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin: 20px 0;
+    }
+    
+    button {
+      padding: 12px;
+      border: none;
+      border-radius: 4px;
+      background-color: #333;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    button:hover {
+      background-color: #444;
+    }
+    
+    button svg {
+      margin-right: 8px;
+      width: 18px;
+      height: 18px;
+    }
+    
+    #toggleWidgetBtn {
+      background-color: #2e7d32;
+    }
+    
+    #toggleWidgetBtn:hover {
+      background-color: #43a047;
+    }
+    
+    #toggleWidgetBtn.hide {
+      background-color: #c62828;
+    }
+    
+    #toggleWidgetBtn.hide:hover {
+      background-color: #e53935;
+    }
+    
+    #settingsBtn {
+      background-color: #616161;
+    }
+    
+    #settingsBtn:hover {
+      background-color: #757575;
+    }
+    
+    #statusText {
+      text-align: center;
+      padding: 8px;
+      background-color: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      margin-bottom: 15px;
+    }
+    
+    #customizationPanel {
+      display: none;
+    }
+    
+    .setting-group {
+      margin-bottom: 15px;
+    }
+    
+    .setting-label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    
+    select, input[type="range"] {
+      width: 100%;
+      padding: 5px;
+      border-radius: 4px;
+      background-color: #333;
+      color: white;
+      border: 1px solid #444;
+    }
+    
+    .range-value {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 5px;
+      font-size: 12px;
+      color: #aaa;
+    }
+    
+    .note {
+      margin-top: 15px;
+      font-size: 12px;
+      color: #aaa;
+      padding: 8px;
+      border-radius: 4px;
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+    
+    .logo {
+      text-align: center;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .logo-img {
+      width: 200px;
+      margin: 10px auto;
+      display: block;
+    }
+    
+    .divider {
+      height: 1px;
+      background-color: rgba(255, 255, 255, 0.2);
+      margin: 10px 0;
+    }
+    
+    .footer {
+      text-align: center;
+      font-size: 12px;
+      color: #888;
+      margin-top: 15px;
+    }
+    
+    /* User sentiment styles */
+    .user-sentiment-container {
+      margin-top: 10px;
+      padding: 10px;
+      background-color: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+    }
+    
+    .user-sentiment-header {
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 8px;
+      text-align: center;
+      color: #ddd;
+    }
+    
+    .user-sentiment-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 8px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+    
+    .user-sentiment-item:last-child {
+      margin-bottom: 0;
+    }
+    
+    .user-sentiment-item.positive {
+      background-color: rgba(75, 181, 67, 0.15);
+    }
+    
+    .user-sentiment-item.negative {
+      background-color: rgba(231, 76, 60, 0.15);
+    }
+    
+    .user-sentiment-name {
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+    }
+    
+    .user-sentiment-name span {
+      margin-right: 5px;
+    }
+    
+    .user-sentiment-score {
+      font-size: 12px;
+      font-weight: bold;
+    }
+    
+    .user-sentiment-score.positive {
+      color: rgb(75, 181, 67);
+    }
+    
+    .user-sentiment-score.negative {
+      color: rgb(231, 76, 60);
+    }
+  </style>
+</head>
+<body>
+  <div id="mainPanel">
+    <div class="logo">
+      <span style="font-size: 20px; font-weight: bold;">Kick Mood Meter</span>
+    </div>
+    
+    <!-- <img src="Mood_Meter.png" alt="Mood Meter" class="logo-img"> -->
+    
+    <div id="statusText">Widget is active on current page</div>
+    
+    <!-- User sentiment section -->
+    <div class="user-sentiment-container">
+      <div class="user-sentiment-header">Chat User Analysis</div>
+      
+      <div class="user-sentiment-item positive">
+        <div class="user-sentiment-name">
+          <span>😄</span> Most Positive: <span id="mostPositiveUser">Loading...</span>
+        </div>
+        <div class="user-sentiment-score positive" id="positiveUserScore">-</div>
+      </div>
+      
+      <div class="user-sentiment-item negative">
+        <div class="user-sentiment-name">
+          <span>😡</span> Most Toxic: <span id="mostToxicUser">Loading...</span>
+        </div>
+        <div class="user-sentiment-score negative" id="toxicUserScore">-</div>
+      </div>
+    </div>
+    
+    <div class="button-container">
+      <button id="toggleWidgetBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 3h6v6"></path>
+          <path d="M10 14 21 3"></path>
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+        </svg>
+        Show/Hide Widget
+      </button>
+      
+      <button id="settingsBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+          <circle cx="12" cy="12" r="3"></circle>
+        </svg>
+        Settings
+      </button>
+    </div>
+    
+    <div class="note">
+      <strong>Tip:</strong> Double-click on the widget to enable drag mode, then click and drag to move it anywhere on the page.
+    </div>
+  </div>
+  
+  <div id="customizationPanel">
+    <h1>Settings</h1>
+    
+    <div class="setting-group">
+      <label class="setting-label" for="transparencyRange">Background Transparency</label>
+      <input type="range" id="transparencyRange" min="10" max="95" value="85">
+      <div class="range-value">
+        <span>Solid</span>
+        <span>Transparent</span>
+      </div>
+    </div>
+    
+    <div class="setting-group">
+      <label class="setting-label" for="updateFrequencyRange">Update Frequency</label>
+      <input type="range" id="updateFrequencyRange" min="5" max="60" value="5">
+      <div class="range-value">
+        <span>5 min</span>
+        <span>60 min</span>
+      </div>
+      <div class="current-value" style="text-align: center; margin-top: 5px; font-size: 12px; color: #aaa;">
+        Current: <span id="updateFrequencyValue">5 minutes</span>
+      </div>
+    </div>
+    
+    <div class="button-container">
+      <button id="backBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m12 19-7-7 7-7"></path>
+          <path d="M19 12H5"></path>
+        </svg>
+        Back
+      </button>
+      <button id="saveSettingsBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+          <polyline points="17 21 17 13 7 13 7 21"></polyline>
+          <polyline points="7 3 7 8 15 8"></polyline>
+        </svg>
+        Save Settings
+      </button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
