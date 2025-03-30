@@ -149,6 +149,71 @@
       color: #888;
       margin-top: 15px;
     }
+    
+    .mood-stats {
+      margin-bottom: 15px;
+      padding: 10px;
+      background-color: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+    
+    .mood-stats-header {
+      font-weight: bold;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    
+    .mood-stat {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    
+    .mood-label {
+      width: 70px;
+      font-size: 13px;
+    }
+    
+    .mood-bar-container {
+      flex-grow: 1;
+      height: 18px;
+      background-color: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .mood-bar {
+      height: 100%;
+      transition: width 0.5s ease-in-out;
+    }
+    
+    .mood-bar.positive {
+      background-color: #4caf50;
+    }
+    
+    .mood-bar.neutral {
+      background-color: #2196f3;
+    }
+    
+    .mood-bar.negative {
+      background-color: #f44336;
+    }
+    
+    .mood-bar-container span {
+      position: absolute;
+      right: 5px;
+      top: 1px;
+      font-size: 12px;
+      color: white;
+      text-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+    }
+    
+    .overall-mood {
+      text-align: center;
+      margin-top: 8px;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -158,6 +223,32 @@
     </div>
     
     <div id="statusText">Widget is active on current page</div>
+    
+    <div id="moodStatsContainer" class="mood-stats">
+      <div class="mood-stats-header">Current Chat Mood</div>
+      <div class="mood-stat">
+        <div class="mood-label">Positive:</div>
+        <div class="mood-bar-container">
+          <div id="positiveBar" class="mood-bar positive" style="width: 0%"></div>
+          <span id="positiveValue">0%</span>
+        </div>
+      </div>
+      <div class="mood-stat">
+        <div class="mood-label">Neutral:</div>
+        <div class="mood-bar-container">
+          <div id="neutralBar" class="mood-bar neutral" style="width: 0%"></div>
+          <span id="neutralValue">0%</span>
+        </div>
+      </div>
+      <div class="mood-stat">
+        <div class="mood-label">Negative:</div>
+        <div class="mood-bar-container">
+          <div id="negativeBar" class="mood-bar negative" style="width: 0%"></div>
+          <span id="negativeValue">0%</span>
+        </div>
+      </div>
+      <div id="overallMood" class="overall-mood">Overall: <span id="overallMoodValue">No data</span></div>
+    </div>
     
     <div class="button-container">
       <button id="toggleWidgetBtn">

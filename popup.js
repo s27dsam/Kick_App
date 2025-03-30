@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     // Check if we're on a Kick.com page
     if (tabs[0].url.includes('kick.com')) {
-      // Request current widget status from content script
+      // Request current widget status and mood stats from content script
       chrome.tabs.sendMessage(tabs[0].id, { action: 'getMood' }, (response) => {
         if (response) {
           // Update toggle button text based on widget visibility
@@ -12,6 +12,11 @@ document.addEventListener('DOMContentLoaded', () => {
           document.getElementById('statusText').textContent = response.isVisible 
             ? 'Widget is active on current page' 
             : 'Widget is hidden on current page';
+          
+          // Update mood statistics if available
+          if (response.moodStats) {
+            updateMoodStats(response.moodStats);
+          }
         } else {
           // Content script might not be loaded yet
           document.getElementById('statusText').textContent = 'Waiting for page to load...';
@@ -128,11 +133,49 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('settingsBtn').style.opacity = 0.5;
   }
   
+  // Function to update the mood statistics display
+  function updateMoodStats(moodStats) {
+    // Format percentages
+    const positive = Math.round(moodStats.positive);
+    const neutral = Math.round(moodStats.neutral);
+    const negative = Math.round(moodStats.negative);
+    
+    // Update progress bars
+    document.getElementById('positiveBar').style.width = `${positive}%`;
+    document.getElementById('neutralBar').style.width = `${neutral}%`;
+    document.getElementById('negativeBar').style.width = `${negative}%`;
+    
+    // Update percentage text
+    document.getElementById('positiveValue').textContent = `${positive}%`;
+    document.getElementById('neutralValue').textContent = `${neutral}%`;
+    document.getElementById('negativeValue').textContent = `${negative}%`;
+    
+    // Determine overall mood
+    let overallMood = "Neutral";
+    if (positive > neutral && positive > negative) {
+      overallMood = "Positive";
+    } else if (negative > neutral && negative > positive) {
+      overallMood = "Negative";
+    }
+    
+    // Update overall mood text with color coding
+    const overallMoodElement = document.getElementById('overallMoodValue');
+    overallMoodElement.textContent = overallMood;
+    
+    // Apply color coding to overall mood
+    if (overallMood === "Positive") {
+      overallMoodElement.style.color = "#4caf50";
+    } else if (overallMood === "Negative") {
+      overallMoodElement.style.color = "#f44336";
+    } else {
+      overallMoodElement.style.color = "#2196f3";
+    }
+  }
+  
   // Set up message listener to receive updates from content script
   chrome.runtime.onMessage.addListener((message) => {
-    if (message.mood) {
-      // We receive mood updates from content script, but we don't need to do anything
-      // with them now that we've removed the user sentiment display
+    if (message.action === "updateMoodStats" && message.moodStats) {
+      updateMoodStats(message.moodStats);
     }
   });
 });

@@ -7,6 +7,13 @@ class KickMoodMeter {
       'label_1': 'neutral',
       'label_2': 'positive'
     };
+
+    this.moodStats = {
+      positive: 0,
+      neutral: 0,
+      negative: 0
+    };
+
     
     // Message history keyed by message text for quick lookup
     this.messageToSentimentMap = new Map();
@@ -418,6 +425,91 @@ class KickMoodMeter {
     return moodObj;
   }
 
+  calculateMoodStats() {
+    // Initialize counters
+    let positiveCount = 0;
+    let neutralCount = 0;
+    let negativeCount = 0;
+    
+    // Analyze each message in chat history
+    this.chatHistory.forEach(message => {
+      // Check if we have a pre-labeled sentiment for this message
+      if (this.sentimentDataLoaded && this.messageToSentimentMap.has(message.message)) {
+        const sentimentLabel = this.messageToSentimentMap.get(message.message);
+        
+        // Count based on sentiment label
+        if (sentimentLabel === 'label_2') {
+          positiveCount++; // positive
+        } else if (sentimentLabel === 'label_0') {
+          negativeCount++; // negative
+        } else {
+          neutralCount++; // neutral (label_1)
+        }
+      } else {
+        // For messages without labels, use the original word-based analysis
+        const words = message.message.split(/\s+/);
+        let messageScore = 0;
+        
+        words.forEach((word, index) => {
+          // Check for intensifiers
+          if (this.intensifiers[word]) {
+            const intensityMultiplier = this.intensifiers[word];
+            const nextWord = words[index + 1];
+            
+            if (!this.sentimentDataLoaded) {
+              // Original word-based approach
+              if (this.positiveWords && this.positiveWords.includes(nextWord)) {
+                messageScore += 1 * intensityMultiplier;
+              } else if (this.negativeWords && this.negativeWords.includes(nextWord)) {
+                messageScore -= 1 * intensityMultiplier;
+              }
+            }
+          }
+          
+          // Direct word matching for fallback mode
+          if (!this.sentimentDataLoaded) {
+            if (this.positiveWords && this.positiveWords.includes(word)) {
+              messageScore += 1;
+            }
+            if (this.negativeWords && this.negativeWords.includes(word)) {
+              messageScore -= 1;
+            }
+          }
+        });
+        
+        // Categorize based on message score
+        if (messageScore > 0) {
+          positiveCount++;
+        } else if (messageScore < 0) {
+          negativeCount++;
+        } else {
+          neutralCount++;
+        }
+      }
+    });
+    
+    // Calculate percentages
+    const total = positiveCount + neutralCount + negativeCount;
+    if (total > 0) {
+      this.moodStats.positive = (positiveCount / total) * 100;
+      this.moodStats.neutral = (neutralCount / total) * 100;
+      this.moodStats.negative = (negativeCount / total) * 100;
+    } else {
+      // Default values if no messages
+      this.moodStats.positive = 0;
+      this.moodStats.neutral = 100;
+      this.moodStats.negative = 0;
+    }
+    
+    // Send the updated stats to the popup if it's open
+    chrome.runtime.sendMessage({
+      action: "updateMoodStats",
+      moodStats: this.moodStats
+    });
+    
+    return this.moodStats;
+  }
+
   interpretMood(score) {
     // We need to flip the level calculation since the meter image has negative on the right
     if (score > 1) return { mood: 'HYPE 🔥', level: 0 };  // Highest positive is now at level 0
@@ -640,6 +732,8 @@ class KickMoodMeter {
     
     // Analyze the collected messages
     const moodObj = this.analyzeMood(this.chatHistory);
+    // Calculate and update mood statistics for popup
+    this.calculateMoodStats();
     const explanation = this.getExplanation(moodObj);
     
     // Update the widget with results
@@ -988,9 +1082,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       level: moodObj.level, 
       explanation: explanation,
       isVisible: !!document.getElementById('kick-mood-widget')?.style.display !== 'none',
-      isChannelPage: true
+      isChannelPage: true,
+      moodStats: kickMoodMeter.moodStats
     });
-  } 
+  }
+
+  
   else if (request.action === 'toggleWidget') {
     console.log('Toggle widget requested');
     // Only allow toggle if we're on a channel page
