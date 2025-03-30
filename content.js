@@ -1065,7 +1065,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log('Is this a channel page?', isChannel);
     
     if (!isChannel) {
-      sendResponse({ 
+      sendResponse({  
         mood: 'Not on a channel', 
         level: -1, 
         explanation: 'Widget is only available on channel pages',
@@ -1087,7 +1087,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
   }
 
-  
+
   else if (request.action === 'toggleWidget') {
     console.log('Toggle widget requested');
     // Only allow toggle if we're on a channel page
