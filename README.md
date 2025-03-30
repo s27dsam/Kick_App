@@ -32,8 +32,6 @@ Kick Mood Meter helps streamers and viewers understand the overall sentiment of 
 4. Click "Load unpacked" and select the extension directory
 5. Navigate to any Kick.com channel page to see the widget in action
 
-## Usage
-
 ### Viewing Sentiment Data
 
 - The widget automatically appears on any Kick.com channel page
