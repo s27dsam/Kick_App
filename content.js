@@ -8,6 +8,12 @@ class KickMoodMeter {
       'label_2': 'positive'
     };
 
+    this.sentimentCounts = {
+      positive: 0,
+      neutral: 0, 
+      negative: 0
+    };
+
     this.moodStats = {
       positive: 0,
       neutral: 0,
@@ -102,7 +108,9 @@ class KickMoodMeter {
         this.updateChannelInfo();
         
         // Reset and restart collection
+        // Reset and restart collection
         this.chatHistory = [];
+        this.resetSentimentCounts(); // ADD THIS LINE
         if (this.isCollecting) {
           clearInterval(this.collectionInterval);
           this.isCollecting = false;
@@ -114,6 +122,15 @@ class KickMoodMeter {
         }, 1000);
       }
     }, 500); // Check more frequently (500ms instead of 1000ms)
+  }
+
+  resetSentimentCounts() {
+    // Reset the counts for count-based intensity scaling
+    this.sentimentCounts = {
+      positive: 0,
+      neutral: 0,
+      negative: 0
+    };
   }
   
   async loadSentimentData() {
@@ -129,13 +146,108 @@ class KickMoodMeter {
       
       const csvText = await response.text();
       console.log('CSV data received, length:', csvText.length);
-
+  
+      // Actually parse the CSV data after loading it
+      this.parseSentimentCsv(csvText);
+      
       this.sentimentDataLoaded = true;
+      console.log('Sentiment map size after loading:', this.messageToSentimentMap.size);
+      
+      // Debug: Log some sample entries from the sentiment map
+      let count = 0;
+      for (const [message, sentiment] of this.messageToSentimentMap.entries()) {
+        console.log(`Sample ${count+1}: "${message}" -> ${sentiment}`);
+        count++;
+        if (count >= 5) break; // Just show 5 samples
+      }
     } catch (error) {
       console.error('Error loading sentiment data:', error);
       // Fall back to the original dictionaries if CSV loading fails
-      // this.fallbackToOriginalDictionaries();
+      this.fallbackToOriginalDictionaries();
     }
+  }
+
+
+  fallbackToOriginalDictionaries() {
+    console.log('Falling back to original word dictionaries');
+    
+    // Positive words dictionary
+    this.positiveWords = [
+      // General positive words
+      'good', 'great', 'awesome', 'amazing', 'excellent', 'fantastic', 'incredible', 'brilliant',
+      'perfect', 'wonderful', 'outstanding', 'superb', 'magnificent', 'exceptional', 'marvelous',
+      'terrific', 'fabulous', 'splendid', 'lovely', 'beautiful', 'impressive', 'remarkable',
+      'stunning', 'breathtaking', 'phenomenal', 'epic', 'rad', 'sick', 'insane', 'fire',
+      
+      // Stream-specific positive words
+      'poggers', 'pog', 'pogu', 'pogchamp', 'ez', 'gg', 'win', 'winner', 'victory', 'clutch',
+      'cracked', 'goated', 'based', 'w', 'huge', 'godlike', 'legend', 'pro', 'skilled', 'talent',
+      'carry', 'king', 'queen', 'beast', 'monster', 'genius', 'mastermind', 'dominating',
+      'unstoppable', 'unreal', 'unbelievable', 'underrated', 'godtier', 'clean', 'smooth',
+      'flawless', 'precise', 'accurate', 'smart', 'intelligent', 'wise', 'strategic', 'tactical',
+      'hype', 'iconic', 'legendary', 'elite', 'superior', 'prayge', 'letsgoo', 'lets go',
+      
+      // Emotes and emote-like text often used positively
+      'lol', 'xd', 'lmao', 'rofl', 'lulw', 'kekw', 'omegalul', 'pepelaugh', 'pepehands',
+      'widepeeposad', 'widepeepoHappy', 'peepolove', 'peepoheart', 'catjam', 'peepodance',
+      'widepeepohappy', 'pepega', 'pepejam', 'peepoclap', 'hypers', 'poggers', 'pogu',
+      'peepogleeful', 'peeposhy', 'pepeheart', '<3', '♥', '❤️',
+      
+      // Supportive terms
+      'support', 'thanks', 'thank you', 'appreciate', 'grateful', 'blessed', 'proud', 'respect',
+      'admire', 'honor', 'applaud', 'cherish', 'value', 'adore', 'idol', 'inspiration', 'hero',
+      'goat', 'best', 'top', 'favorite', 'fav', 'deserved', 'earned', 'worth', 'helpful',
+      'generous', 'kind', 'caring', 'wholesome', 'friendly', 'welcoming', 'positive', 'uplifting',
+      
+      // Excitement expressions
+      'yes', 'po', 'woo', 'woohoo', 'yay', 'omg', 'oh my god', 'holy', 'holy moly', 'unreal',
+      'incredible', 'insane', 'crazy', 'wild', 'intense', 'exciting', 'thrilling', 'exhilarating',
+      'astonishing', 'impressive', 'mind-blowing', 'mindblowing', 'game-changing', 'revolutionary',
+      'innovative', 'creative', 'next-level', 'nextlevel', 'big brain', 'bigbrain'
+    ];
+    
+    // Negative words dictionary
+    this.negativeWords = [
+      // General negative words
+      'bad', 'terrible', 'awful', 'horrible', 'poor', 'disappointing', 'disappointing', 'pathetic',
+      'miserable', 'dreadful', 'abysmal', 'atrocious', 'subpar', 'mediocre', 'inferior', 'useless',
+      'worthless', 'garbage', 'trash', 'junk', 'rubbish', 'waste', 'joke', 'mess', 'disaster',
+      'catastrophe', 'fail', 'failure', 'flop', 'bust', 'letdown', 'disgrace', 'embarrassment',
+      
+      // Stream-specific negative words
+      'l', 'losing', 'loser', 'lose', 'lost', 'choke', 'throw', 'throwing', 'threw', 'bot',
+      'boosted', 'carried', 'hardstuck', 'stuck', 'casual', 'noob', 'newb', 'newbie', 'scrub',
+      'baddie', 'pleb', 'pepega', 'washed', 'outdated', 'overrated', 'overhyped', 'overpaid',
+      'sellout', 'repetitive', 'boring', 'sleeper', 'residentsleeper', 'cringe', 'yikes',
+      'awkward', 'weird', 'strange', 'sus', 'suspicious', 'sketch', 'sketchy', 'monkas',
+      
+      // Toxic expressions
+      'idiot', 'stupid', 'dumb', 'moronic', 'braindead', 'brainless', 'clueless', 'hopeless',
+      'incompetent', 'inept', 'dense', 'fool', 'clown', 'joke', 'bozo', 'doofus', 'buffoon',
+      'clown', 'loser', 'deadbeat', 'degenerate', 'reject', 'fraud', 'phony', 'fake', 'poser',
+      'wannabe', 'tryhard', 'try-hard', 'malding', 'tilted', 'toxic', 'salty', 'rage', 'triggered',
+      'mad', 'angry', 'furious', 'livid', 'enraged', 'disgusting', 'gross', 'nasty', 'vile',
+      'repulsive', 'revolting', 'despicable', 'detestable', 'loathsome', 'abhorrent', 'hateful',
+      
+      // Critical terms
+      'quit', 'stop', 'leave', 'end', 'retire', 'give up', 'surrender', 'concede', 'forfeit',
+      'awful', 'terrible', 'horrible', 'garbage', 'trash', 'junk', 'rubbish', 'waste', 'useless',
+      'worthless', 'disgraceful', 'disgraceful', 'shameful', 'shameless', 'pathetic', 'pitiful',
+      'miserable', 'wretched', 'deplorable', 'disappointing', 'dismal', 'dreadful', 'unbearable',
+      'intolerable', 'insufferable', 'unacceptable', 'unsatisfactory', 'unpleasant', 'unenjoyable',
+      
+      // Complaint expressions
+      'lag', 'laggy', 'buggy', 'glitchy', 'broken', 'bugged', 'rigged', 'scuffed', 'scam',
+      'scammed', 'cheating', 'cheated', 'hacking', 'hacked', 'unfair', 'biased', 'prejudiced',
+      'corrupt', 'corrupted', 'unbalanced', 'op', 'overpowered', 'underpowered', 'nerfed',
+      'handicapped', 'disadvantaged', 'unlucky', 'unfortunate', 'cursed', 'doomed', 'stressful',
+      'frustrating', 'aggravating', 'annoying', 'irritating', 'infuriating', 'maddening',
+      'exasperating', 'vexing', 'grating', 'irksome'
+    ];
+    
+    console.log('Loaded fallback dictionaries with', 
+      this.positiveWords.length, 'positive words and', 
+      this.negativeWords.length, 'negative words');
   }
   
   parseSentimentCsv(csvText) {
@@ -336,13 +448,20 @@ class KickMoodMeter {
   extractChatMessages() {
     const messagesContainer = document.querySelector('#chatroom-messages');
     
-    if (!messagesContainer) return [];
-
+    if (!messagesContainer) {
+      console.log('No chat messages container found');
+      return [];
+    }
+  
+    // Log the structure of the chat container to help with debugging
+    console.log('Chat container:', messagesContainer);
+    
     const messageElements = messagesContainer.querySelectorAll('[data-index]');
+    console.log(`Found ${messageElements.length} message elements`);
     
     const messages = [];
     
-    Array.from(messageElements).forEach(messageEl => {
+    Array.from(messageElements).forEach((messageEl, index) => {
       // Get the username
       const usernameElement = messageEl.querySelector('.chat-entry-username');
       const username = usernameElement ? usernameElement.textContent.trim() : 'Unknown';
@@ -352,6 +471,16 @@ class KickMoodMeter {
       const messageText = messageTextElement ? messageTextElement.textContent.trim().toLowerCase() : '';
       
       if (messageText.length > 0) {
+        console.log(`Message ${index}: "${username}": "${messageText}"`);
+        
+        // Check if we have sentiment data for this message
+        if (this.messageToSentimentMap.has(messageText)) {
+          const sentiment = this.messageToSentimentMap.get(messageText);
+          console.log(`  → Sentiment match found: ${sentiment}`);
+        } else {
+          console.log(`  → No sentiment match found`);
+        }
+        
         messages.push({
           username: username,
           message: messageText
@@ -359,34 +488,69 @@ class KickMoodMeter {
       }
     });
     
+    console.log(`Total messages extracted: ${messages.length}`);
     return messages;
   }
 
   analyzeMood(messages) {
+    // Reset counts for this analysis
+    this.resetSentimentCounts();
+    
     let sentimentScore = 0;
     let totalMessages = messages.length;
     
+    console.log(`Analyzing mood for ${totalMessages} messages`);
+    console.log(`Sentiment data loaded: ${this.sentimentDataLoaded}`);
+    console.log(`Message to sentiment map size: ${this.messageToSentimentMap.size}`);
+
+    // Add at the beginning of analyzeMood
+      console.log("Dictionaries loaded:", {
+      positiveWordsLoaded: Array.isArray(this.positiveWords),
+      positiveWordsCount: Array.isArray(this.positiveWords) ? this.positiveWords.length : 0,
+      negativeWordsLoaded: Array.isArray(this.negativeWords),
+      negativeWordsCount: Array.isArray(this.negativeWords) ? this.negativeWords.length : 0
+    });
+        
     if (totalMessages === 0) return { mood: 'Waiting for chat...', level: 2 };
     
-    messages.forEach(message => {
+    // Debug: Log if we have any sentiment matches at all
+    if (this.messageToSentimentMap.size > 0) {
+      let foundMatches = 0;
+      messages.forEach(message => {
+        if (this.messageToSentimentMap.has(message.message)) {
+          foundMatches++;
+        }
+      });
+      console.log(`Found ${foundMatches} sentiment matches out of ${totalMessages} messages`);
+    }
+    
+    messages.forEach((message, index) => {
       let messageScore = 0;
       
       // Check if we have a pre-labeled sentiment for this exact message
       if (this.sentimentDataLoaded && this.messageToSentimentMap.has(message.message)) {
         const sentimentLabel = this.messageToSentimentMap.get(message.message);
+        console.log(`Message ${index}: "${message.message}" has sentiment: ${sentimentLabel}`);
         
-        // Convert label to score
+        // Convert label to score and increment count
         if (sentimentLabel === 'label_2') {
           messageScore = 1; // positive
+          this.sentimentCounts.positive++;
+          console.log(`  → Positive sentiment detected`);
         } else if (sentimentLabel === 'label_0') {
           messageScore = -1; // negative
+          this.sentimentCounts.negative++;
+          console.log(`  → Negative sentiment detected`);
         } else {
           messageScore = 0; // neutral (label_1)
+          this.sentimentCounts.neutral++;
+          console.log(`  → Neutral sentiment detected`);
         }
       } else {
+        console.log(`Message ${index}: "${message.message}" - no sentiment data, using fallback`);
         // Fall back to the original word-based analysis if no exact match
         const words = message.message.split(/\s+/);
-
+  
         words.forEach((word, index) => {
           // Check for intensifiers
           if (this.intensifiers[word]) {
@@ -402,7 +566,7 @@ class KickMoodMeter {
               messageScore -= 1 * intensityMultiplier;
             }
           }
-
+  
           // Direct word matching for fallback mode
           if (!this.sentimentDataLoaded) {
             if (this.positiveWords && this.positiveWords.includes(word)) {
@@ -413,16 +577,56 @@ class KickMoodMeter {
             }
           }
         });
+        
+        // Increment sentiment count based on message score for the fallback case
+        if (messageScore > 0) {
+          this.sentimentCounts.positive++;
+          console.log(`  → Detected as positive through fallback method`);
+        } else if (messageScore < 0) {
+          this.sentimentCounts.negative++;
+          console.log(`  → Detected as negative through fallback method`);
+        } else {
+          this.sentimentCounts.neutral++;
+          console.log(`  → Detected as neutral through fallback method`);
+        }
       }
-
+  
       sentimentScore += messageScore;
     });
-
-    // Normalize sentiment score
-    const normalizedScore = sentimentScore / totalMessages;
-    const moodObj = this.interpretMood(normalizedScore);
-
+  
+    console.log('Final sentiment counts:', this.sentimentCounts);
+    
+    // Use new intensity-based interpretation instead of the original normalized approach
+    const moodObj = this.interpretMoodWithIntensity();
+    console.log('Mood interpretation:', moodObj);
+    
     return moodObj;
+  }
+
+  interpretMoodWithIntensity() {
+    console.log('Sentiment counts:', this.sentimentCounts);
+    
+    // Use the sentiment counts to determine intensity
+    if (this.sentimentCounts.positive >= 3) {
+      return { mood: 'HYPE 🔥', level: 0 };
+    } else if (this.sentimentCounts.positive === 2) {
+      return { mood: 'Positive 😄', level: 1 };
+    } else if (this.sentimentCounts.positive === 1) {
+      return { mood: 'Slightly Positive 🙂', level: 2 };
+    }
+    
+    // Negative intensity - 1 message makes it slightly negative, 2 makes it negative
+    if (this.sentimentCounts.negative >= 3) {
+      return { mood: 'TOXIC 🤬', level: 4 };
+    } else if (this.sentimentCounts.negative === 2) {
+      return { mood: 'Negative 😒', level: 3 };
+    } else if (this.sentimentCounts.negative === 1) {
+      return { mood: 'Slightly Negative 😕', level: 2 };
+    }
+    
+    // Default to neutral if no clear sentiment emerges
+    return { mood: 'Neutral 😐', level: 1 };
+    // return { mood: 'Slightly Positive 🙂', level: 1 };
   }
 
   calculateMoodStats() {
@@ -430,6 +634,9 @@ class KickMoodMeter {
     let positiveCount = 0;
     let neutralCount = 0;
     let negativeCount = 0;
+    
+    // Reset intensity counts
+    this.resetSentimentCounts();
     
     // Analyze each message in chat history
     this.chatHistory.forEach(message => {
@@ -440,10 +647,13 @@ class KickMoodMeter {
         // Count based on sentiment label
         if (sentimentLabel === 'label_2') {
           positiveCount++; // positive
+          this.sentimentCounts.positive++;
         } else if (sentimentLabel === 'label_0') {
           negativeCount++; // negative
+          this.sentimentCounts.negative++;
         } else {
           neutralCount++; // neutral (label_1)
+          this.sentimentCounts.neutral++;
         }
       } else {
         // For messages without labels, use the original word-based analysis
@@ -477,13 +687,15 @@ class KickMoodMeter {
           }
         });
         
-        // Categorize based on message score
         if (messageScore > 0) {
           positiveCount++;
+          this.sentimentCounts.positive++;
         } else if (messageScore < 0) {
           negativeCount++;
+          this.sentimentCounts.negative++;
         } else {
           neutralCount++;
+          this.sentimentCounts.neutral++;
         }
       }
     });
@@ -510,22 +722,12 @@ class KickMoodMeter {
     return this.moodStats;
   }
 
-  interpretMood(score) {
-    // We need to flip the level calculation since the meter image has negative on the right
-    if (score > 1) return { mood: 'HYPE 🔥', level: 0 };  // Highest positive is now at level 0
-    if (score > 0.5) return { mood: 'Positive 😄', level: 1 };
-    if (score > 0) return { mood: 'Slightly Positive 🙂', level: 2 };
-    if (score === 0) return { mood: 'Neutral 😐', level: 2 };
-    if (score > -0.5) return { mood: 'Slightly Negative 😕', level: 3 };
-    if (score > -1) return { mood: 'Negative 😒', level: 4 };
-    return { mood: 'TOXIC 🤬', level: 4 };  // Highest negative is now at level 4
-  }
 
   getMoodLevelPercentage(level) {
     // Convert mood level (0-4) to a percentage position (0-100%) for the arrow
     // 0 = leftmost (most positive), 4 = rightmost (most negative)
     // Each level is 20% of the width (5 levels total)
-    return level * 20 + 10; // +10 to center within each segment
+    return level * 20 + 9; // +10 to center within each segment
   }
 
   getExplanation(moodObj) {
@@ -1055,6 +1257,9 @@ window.addEventListener('load', () => {
   }, 1000);
 });
 
+
+
+
 // Replace the chrome.runtime.onMessage listener with this improved version
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('Received message:', request);
@@ -1086,6 +1291,81 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       moodStats: kickMoodMeter.moodStats
     });
   }
+  // Add this to the bottom of the chrome.runtime.onMessage listener
+else if (request.action === 'manualCollection') {
+  console.log('Manual chat collection requested');
+  
+  // Check if we're on a valid channel page
+  if (!kickMoodMeter.isValidChannelPage()) {
+    sendResponse({
+      success: false,
+      message: 'Not on a channel page, cannot collect chat data'
+    });
+    return true;
+  }
+  
+  // Stop any existing collection
+  if (kickMoodMeter.isCollecting) {
+    clearInterval(kickMoodMeter.collectionInterval);
+    kickMoodMeter.isCollecting = false;
+  }
+  
+  // Start fresh collection with a shorter timer
+  kickMoodMeter.chatHistory = [];
+  kickMoodMeter.resetSentimentCounts();
+  kickMoodMeter.isCollecting = true;
+  kickMoodMeter.collectionStartTime = Date.now();
+  
+  // Show calculating overlay with manual mode indicator
+  kickMoodMeter.showCalculatingOverlay();
+  kickMoodMeter.updateCalculatingOverlay('Manual analysis in progress...');
+  
+  // Set up shortened interval for quick feedback
+  kickMoodMeter.collectionInterval = setInterval(() => {
+    // Extract new messages
+    const newMessages = kickMoodMeter.extractChatMessages();
+    
+    // Add only new messages to our history
+    const existingMessagesMap = new Map(kickMoodMeter.chatHistory.map(msg => [msg.username + msg.message, true]));
+    const uniqueNewMessages = newMessages.filter(msg => !existingMessagesMap.has(msg.username + msg.message));
+    
+    kickMoodMeter.chatHistory = [...kickMoodMeter.chatHistory, ...uniqueNewMessages];
+    
+    // Just collect for 5 seconds with manual trigger
+    const timeRemaining = Math.max(0, 5 - Math.floor((Date.now() - kickMoodMeter.collectionStartTime) / 1000));
+    kickMoodMeter.updateCalculatingOverlay(`Manual analysis: ${timeRemaining} seconds left...`);
+    
+    if (Date.now() - kickMoodMeter.collectionStartTime >= 5000) {
+      // Finish collection early
+      clearInterval(kickMoodMeter.collectionInterval);
+      kickMoodMeter.isCollecting = false;
+      
+      // Hide calculating overlay
+      kickMoodMeter.hideCalculatingOverlay();
+      
+      // Analyze and display results
+      const moodObj = kickMoodMeter.analyzeMood(kickMoodMeter.chatHistory);
+      kickMoodMeter.calculateMoodStats();
+      const explanation = kickMoodMeter.getExplanation(moodObj);
+      
+      // Update widget
+      kickMoodMeter.createOrUpdateWidget(moodObj, explanation);
+      
+      // Send results
+      sendResponse({
+        success: true,
+        mood: moodObj.mood,
+        level: moodObj.level,
+        explanation: explanation,
+        messageCount: kickMoodMeter.chatHistory.length
+      });
+    }
+  }, 1000);
+  
+  // In case sendResponse isn't called by the time the interval finishes
+  // (needed for Chrome's messaging system)
+  return true;
+}
 
 
   else if (request.action === 'toggleWidget') {
@@ -1136,3 +1416,5 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   
   return true;
 });
+
+

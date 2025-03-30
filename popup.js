@@ -179,3 +179,51 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+
+// Add this to your popup.js
+// Replace the incorrect event listener at the bottom of your file with this:
+document.getElementById('collectNowBtn').addEventListener('click', function() {
+  // Update button state
+  const button = document.getElementById('collectNowBtn');
+  button.textContent = 'Collecting...';
+  button.disabled = true;
+  
+  // Send manual collection request
+  chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+    chrome.tabs.sendMessage(tabs[0].id, {action: 'manualCollection'}, function(response) {
+      // Reset button
+      button.textContent = 'Collect Chat Now';
+      button.disabled = false;
+      
+      if (response && response.success) {
+        // Update UI with new results
+        // Update the message count
+        document.getElementById('messageCount').textContent = `Messages analyzed: ${response.messageCount}`;
+        
+        // If you have mood stats from the response, update them
+        if (response.moodStats) {
+          updateMoodStats(response.moodStats);
+        }
+        
+        // Update overall mood display based on the response
+        const overallMoodElement = document.getElementById('overallMoodValue');
+        if (overallMoodElement) {
+          overallMoodElement.textContent = response.mood || 'Neutral';
+          
+          // Apply color coding
+          if (response.mood && response.mood.includes('Positive') || response.mood.includes('HYPE')) {
+            overallMoodElement.style.color = "#4caf50";
+          } else if (response.mood && response.mood.includes('Negative') || response.mood.includes('TOXIC')) {
+            overallMoodElement.style.color = "#f44336";
+          } else {
+            overallMoodElement.style.color = "#2196f3";
+          }
+        }
+      } else {
+        // Show error
+        document.getElementById('statusText').textContent = response && response.message ? 
+          response.message : 'Could not analyze chat on this page';
+      }
+    });
+  });
+});
