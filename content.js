@@ -55,7 +55,41 @@ class KickMoodMeter {
     // Watch for URL changes
     setInterval(() => {
       if (this.currentUrl !== window.location.href) {
+        // URL has changed
+        const previousUrl = this.currentUrl;
         this.currentUrl = window.location.href;
+        console.log(`URL changed from ${previousUrl} to ${this.currentUrl}`);
+        
+        // Check if we're on a valid channel page
+        const isChannelPage = this.isValidChannelPage();
+        
+        if (!isChannelPage) {
+          console.log('Navigated to non-channel page, stopping analysis and hiding widget');
+          
+          // If we're collecting, stop immediately
+          if (this.isCollecting) {
+            clearInterval(this.collectionInterval);
+            this.isCollecting = false;
+            this.collectionStartTime = null;
+          }
+          
+          // Hide the widget
+          const widget = document.getElementById('kick-mood-widget');
+          if (widget) {
+            widget.style.opacity = '0';
+            setTimeout(() => {
+              widget.style.display = 'none';
+            }, 300);
+          }
+          
+          // Clear chat history since it's no longer relevant
+          this.chatHistory = [];
+          
+          return;
+        }
+        
+        // If we're here, we're on a valid channel page
+        console.log('Navigated to a channel page');
         
         // Update channel name in widget
         this.updateChannelInfo();
@@ -72,7 +106,7 @@ class KickMoodMeter {
           this.startCollection();
         }, 1000);
       }
-    }, 1000);
+    }, 500); // Check more frequently (500ms instead of 1000ms)
   }
   
   async loadSentimentData() {
@@ -207,6 +241,90 @@ class KickMoodMeter {
     
     return 'Channel'; // Default fallback
   }
+ 
+  // Update the isValidChannelPage method to be less restrictive
+  isValidChannelPage() {
+    // Get the current URL
+    const url = window.location.href;
+    console.log("Checking if valid channel page:", url);
+    
+    // Quick check if we're not even on kick.com
+    if (!url.includes('kick.com')) {
+      console.log('Not a channel page: not on kick.com');
+      return false;
+    }
+    
+    // Check for specific non-channel URL patterns first
+    const nonChannelPatterns = [
+      'kick.com/browse',
+      'kick.com/following',
+      'kick.com/categories',
+      'kick.com/category',
+      'kick.com/search',
+      'kick.com/messages',
+      'kick.com/subscriptions',
+      'kick.com/clips',
+      'kick.com/help',
+      'kick.com/terms',
+      'kick.com/privacy',
+      'kick.com/about',
+      'kick.com/support',
+      'kick.com/account',
+      'kick.com/wallet',
+      'kick.com/settings',
+      'kick.com/home',
+      'kick.com/login',
+      'kick.com/signup'
+    ];
+    
+    // Check if URL matches any non-channel pattern
+    for (const pattern of nonChannelPatterns) {
+      if (url.includes(pattern)) {
+        console.log(`Not a channel page: matched pattern ${pattern}`);
+        return false;
+      }
+    }
+    
+    // Also check for the homepage
+    if (url === 'https://kick.com/' || 
+        url === 'https://kick.com' || 
+        url.match(/^https:\/\/kick\.com\/?(?:\?.*)?$/)) {
+      console.log('Not a channel page: homepage detected');
+      return false;
+    }
+    
+    // Most importantly - check if the chat element exists
+    // First, log the DOM structure to help with debugging
+    console.log('Current DOM structure:', {
+      hasChat: !!document.querySelector('#chatroom-messages'),
+      hasChatroom: !!document.querySelector('#chat-room'),
+      possibleChatElements: document.querySelectorAll('[id*="chat"], [class*="chat"]'),
+      bodyClasses: document.body.className,
+      channelElements: document.querySelectorAll('[class*="channel"], [id*="channel"]'),
+      playerElements: document.querySelectorAll('[class*="player"], [id*="player"]')
+    });
+    
+    // Look for a chat element with various possible selectors
+    const chatElement = document.querySelector('#chatroom-messages, #chat-room, .chat-messages, .chatroom, [id*="chat-messages"], [class*="chat-container"]');
+    
+    if (!chatElement) {
+      console.log('Not a channel page: no chat element found with any selector');
+      return false;
+    }
+    
+    console.log('Found chat element:', chatElement);
+    
+    // Only do a basic check for a player/video element
+    const videoElement = document.querySelector('video, [class*="player"], [id*="player"], [class*="stream"], [id*="stream"]');
+    
+    if (!videoElement) {
+      console.log('No video player found - might not be a channel page');
+    }
+    
+    // If we made it here, we likely have a chat element, so it's probably a channel page
+    console.log('Valid channel page detected');
+    return true;
+  }
 
   extractChatMessages() {
     const messagesContainer = document.querySelector('#chatroom-messages');
@@ -334,6 +452,27 @@ class KickMoodMeter {
   }
 
   startCollection() {
+    // Immediate check if we're on a valid channel page
+    if (!this.isValidChannelPage()) {
+      console.log('Not on a valid channel page, mood meter disabled');
+      
+      // If we're already collecting, stop
+      if (this.isCollecting) {
+        clearInterval(this.collectionInterval);
+        this.isCollecting = false;
+      }
+      
+      // Hide the widget if it exists
+      const widget = document.getElementById('kick-mood-widget');
+      if (widget) {
+        widget.style.opacity = '0';
+        setTimeout(() => {
+          widget.style.display = 'none';
+        }, 300);
+      }
+      return;
+    }
+    
     if (this.isCollecting) return;
     
     this.isCollecting = true;
@@ -345,6 +484,23 @@ class KickMoodMeter {
     
     // Start periodically checking for new messages
     this.collectionInterval = setInterval(() => {
+      // Add an additional check here to catch navigation during collection
+      if (!this.isValidChannelPage()) {
+        console.log('No longer on a channel page, stopping collection');
+        clearInterval(this.collectionInterval);
+        this.isCollecting = false;
+        
+        // Hide the widget
+        const widget = document.getElementById('kick-mood-widget');
+        if (widget) {
+          widget.style.opacity = '0';
+          setTimeout(() => {
+            widget.style.display = 'none';
+          }, 300);
+        }
+        return;
+      }
+      
       const newMessages = this.extractChatMessages();
       
       // Add only new messages to our history
@@ -513,6 +669,7 @@ class KickMoodMeter {
   }
 
   createOrUpdateWidget(moodObj, explanation) {
+    console.log("Attempting to create/update widget with mood:", moodObj, "explanation:", explanation);
     let widget = document.getElementById('kick-mood-widget');
     
     if (!widget) {
@@ -577,7 +734,7 @@ class KickMoodMeter {
       // Create mood meter image
       const moodMeterImg = document.createElement('img');
       moodMeterImg.id = 'kick-mood-meter-img';
-      moodMeterImg.src = chrome.runtime.getURL('Mood_Meter.png');
+      moodMeterImg.src = chrome.runtime.getURL('images/Mood_Meter.png');
       moodMeterImg.style.cssText = `
         width: 100%;
         height: auto;
@@ -592,7 +749,7 @@ class KickMoodMeter {
       moodIndicator.style.cssText = `
         position: absolute;
         left: 50%;
-        bottom: 0;
+        bottom: 10%;
         width: 0;
         height: 0;
         border-left: 10px solid transparent;
@@ -693,22 +850,30 @@ class KickMoodMeter {
     widget.style.opacity = '1';
   }
   
-  toggleWidget() {
-    const widget = document.getElementById('kick-mood-widget');
-    if (widget) {
-      if (widget.style.display === 'none') {
-        widget.style.display = 'block';
-        setTimeout(() => widget.style.opacity = '1', 10);
-      } else {
-        widget.style.opacity = '0';
-        setTimeout(() => widget.style.display = 'none', 300);
-      }
-    } else {
-      this.createOrUpdateWidget({mood: 'Starting...', level: 2}, 'Collecting data...');
-      this.startCollection();
-    }
-    return !!widget && widget.style.display !== 'none';
+// Replace the toggleWidget method with this improved version
+toggleWidget() {
+  // First check if we're on a valid channel page
+  if (!this.isValidChannelPage()) {
+    console.log("Can't toggle widget on non-channel page");
+    return false;
   }
+  
+  const widget = document.getElementById('kick-mood-widget');
+  if (widget) {
+    if (widget.style.display === 'none') {
+      widget.style.display = 'block';
+      setTimeout(() => widget.style.opacity = '1', 10);
+    } else {
+      widget.style.opacity = '0';
+      setTimeout(() => widget.style.display = 'none', 300);
+    }
+  } else {
+    // Only create widget if we're on a valid channel page
+    this.createOrUpdateWidget({mood: 'Starting...', level: 2}, 'Collecting data...');
+    this.startCollection();
+  }
+  return !!widget && widget.style.display !== 'none';
+}
   
   updateSettings(newSettings) {
     this.settings = {...this.settings, ...newSettings};
@@ -726,33 +891,151 @@ class KickMoodMeter {
 // Initialize and start the mood meter
 const kickMoodMeter = new KickMoodMeter();
 
-// Wait for page to fully load
-window.addEventListener('load', () => {
-  // Start initial collection after 2 seconds to ensure chat elements are loaded
-  setTimeout(() => {
-    kickMoodMeter.startCollection();
-  }, 2000);
+// Add visibility change listener to detect tab/window switching
+document.addEventListener('visibilitychange', () => {
+  // When the tab becomes visible again, check if we're still on a valid page
+  if (document.visibilityState === 'visible') {
+    console.log('Tab became visible, checking if still on channel page');
+    
+    if (kickMoodMeter) {
+      const isChannelPage = kickMoodMeter.isValidChannelPage();
+      
+      if (!isChannelPage && kickMoodMeter.isCollecting) {
+        console.log('No longer on channel page, stopping analysis');
+        clearInterval(kickMoodMeter.collectionInterval);
+        kickMoodMeter.isCollecting = false;
+        
+        // Hide the widget
+        const widget = document.getElementById('kick-mood-widget');
+        if (widget) {
+          widget.style.opacity = '0';
+          setTimeout(() => {
+            widget.style.display = 'none';
+          }, 300);
+        }
+      }
+    }
+  }
 });
 
-// Handle messages from popup
+// Wait for page to fully load
+window.addEventListener('load', () => {
+  // Check if we're on a valid channel page initially
+  const initialCheck = kickMoodMeter.isValidChannelPage();
+  console.log('Initial channel page check:', initialCheck);
+  
+  if (initialCheck) {
+    // Start initial collection after 2 seconds to ensure chat elements are loaded
+    setTimeout(() => {
+      kickMoodMeter.startCollection();
+    }, 2000);
+  }
+  
+  // Set up a periodic check for channel page status in case the DOM loads slowly
+  let checkCount = 0;
+  const pageCheckInterval = setInterval(() => {
+    const isChannelPage = kickMoodMeter.isValidChannelPage();
+    checkCount++;
+    
+    if (isChannelPage && !kickMoodMeter.isCollecting) {
+      console.log('Channel page detected on check', checkCount);
+      kickMoodMeter.startCollection();
+      clearInterval(pageCheckInterval);
+    } else if (!isChannelPage && kickMoodMeter.isCollecting) {
+      console.log('No longer on channel page');
+      clearInterval(kickMoodMeter.collectionInterval);
+      kickMoodMeter.isCollecting = false;
+      
+      // Hide the widget
+      const widget = document.getElementById('kick-mood-widget');
+      if (widget) {
+        widget.style.display = 'none';
+      }
+      clearInterval(pageCheckInterval);
+    }
+    
+    // Only check for a limited time to avoid infinite checking
+    if (checkCount > 10) {
+      clearInterval(pageCheckInterval);
+    }
+  }, 1000);
+});
+
+// Replace the chrome.runtime.onMessage listener with this improved version
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  console.log('Received message:', request);
+  
   if (request.action === 'getMood') {
+    // Check if we're on a valid channel page
+    const isChannel = kickMoodMeter.isValidChannelPage();
+    console.log('Is this a channel page?', isChannel);
+    
+    if (!isChannel) {
+      sendResponse({ 
+        mood: 'Not on a channel', 
+        level: -1, 
+        explanation: 'Widget is only available on channel pages',
+        isVisible: false,
+        isChannelPage: false
+      });
+      return true;
+    }
+    
     const moodObj = kickMoodMeter.analyzeMood(kickMoodMeter.chatHistory);
     const explanation = kickMoodMeter.getExplanation(moodObj);
     sendResponse({ 
       mood: moodObj.mood, 
       level: moodObj.level, 
       explanation: explanation,
-      isVisible: !!document.getElementById('kick-mood-widget')?.style.display !== 'none'
+      isVisible: !!document.getElementById('kick-mood-widget')?.style.display !== 'none',
+      isChannelPage: true
     });
   } 
   else if (request.action === 'toggleWidget') {
+    console.log('Toggle widget requested');
+    // Only allow toggle if we're on a channel page
+    const isChannel = kickMoodMeter.isValidChannelPage();
+    console.log('Is this a channel page for toggle?', isChannel);
+    
+    if (!isChannel) {
+      console.log('Not on a channel page, cannot toggle widget');
+      sendResponse({ 
+        isVisible: false,
+        isChannelPage: false,
+        message: 'Widget is only available on channel pages'
+      });
+      return true;
+    }
+    
+    console.log('On a channel page, toggling widget');
     const isVisible = kickMoodMeter.toggleWidget();
-    sendResponse({ isVisible: isVisible });
+    console.log('Widget toggled, now visible:', isVisible);
+    sendResponse({ 
+      isVisible: isVisible,
+      isChannelPage: true
+    });
   }
   else if (request.action === 'updateSettings') {
     kickMoodMeter.updateSettings(request.settings);
     sendResponse({ success: true });
   }
+  else if (request.action === 'forceShow') {
+    // Add a special debug action to force showing the widget
+    console.log('Force showing widget requested');
+    
+    if (!document.getElementById('kick-mood-widget')) {
+      kickMoodMeter.createOrUpdateWidget({mood: 'Debug Mode', level: 2}, 'Forced widget display');
+    }
+    
+    const widget = document.getElementById('kick-mood-widget');
+    if (widget) {
+      widget.style.display = 'block';
+      widget.style.opacity = '1';
+      sendResponse({ success: true, message: 'Widget forced to show' });
+    } else {
+      sendResponse({ success: false, message: 'Could not create widget' });
+    }
+  }
+  
   return true;
 });

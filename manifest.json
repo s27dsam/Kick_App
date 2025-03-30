@@ -11,8 +11,10 @@
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
+      "64": "images/happy_64.png",
+      "32": "images/happy_32.png",
+      "16": "images/happy_16.png"
 
-      "128": "kick-logo.png"
     }
 
 
@@ -26,7 +28,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["Mood_Meter.png", "labeled_chat_messages.csv"],
+      "resources": ["images/Mood_Meter.png", "labeled_chat_messages.csv"],
       "matches": ["*://*.kick.com/*"]
     }
   ]
