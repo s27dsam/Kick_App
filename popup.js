@@ -12,9 +12,6 @@ document.addEventListener('DOMContentLoaded', () => {
           document.getElementById('statusText').textContent = response.isVisible 
             ? 'Widget is active on current page' 
             : 'Widget is hidden on current page';
-            
-          // Update user sentiment information
-          updateUserSentiment(response);
         } else {
           // Content script might not be loaded yet
           document.getElementById('statusText').textContent = 'Waiting for page to load...';
@@ -24,7 +21,6 @@ document.addEventListener('DOMContentLoaded', () => {
       // Not on Kick.com
       document.getElementById('statusText').textContent = 'This extension only works on kick.com';
       disableButtons();
-      hideUserSentiment();
     }
   });
 
@@ -124,43 +120,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
   
-  function updateUserSentiment(response) {
-    // Update most positive user
-    const mostPositiveUser = document.getElementById('mostPositiveUser');
-    const positiveUserScore = document.getElementById('positiveUserScore');
-    
-    if (response.mostPositiveUser && response.mostPositiveUser !== 'None') {
-      mostPositiveUser.textContent = response.mostPositiveUser;
-      
-      // Format positive score with a + sign if positive
-      const scoreValue = parseFloat(response.positiveScore);
-      const formattedScore = scoreValue > 0 ? `+${response.positiveScore}` : response.positiveScore;
-      positiveUserScore.textContent = formattedScore;
-    } else {
-      mostPositiveUser.textContent = 'No data yet';
-      positiveUserScore.textContent = '-';
-    }
-    
-    // Update most toxic user
-    const mostToxicUser = document.getElementById('mostToxicUser');
-    const toxicUserScore = document.getElementById('toxicUserScore');
-    
-    if (response.mostToxicUser && response.mostToxicUser !== 'None') {
-      mostToxicUser.textContent = response.mostToxicUser;
-      toxicUserScore.textContent = response.toxicScore;
-    } else {
-      mostToxicUser.textContent = 'No data yet';
-      toxicUserScore.textContent = '-';
-    }
-  }
-  
-  function hideUserSentiment() {
-    const userSentimentContainer = document.querySelector('.user-sentiment-container');
-    if (userSentimentContainer) {
-      userSentimentContainer.style.display = 'none';
-    }
-  }
-  
   function disableButtons() {
     document.getElementById('toggleWidgetBtn').disabled = true;
     document.getElementById('settingsBtn').disabled = true;
@@ -172,8 +131,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Set up message listener to receive updates from content script
   chrome.runtime.onMessage.addListener((message) => {
     if (message.mood) {
-      // Update user sentiment information if available
-      updateUserSentiment(message);
+      // We receive mood updates from content script, but we don't need to do anything
+      // with them now that we've removed the user sentiment display
     }
   });
 });

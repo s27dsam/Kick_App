@@ -22,7 +22,6 @@ class KickMoodMeter {
     };
     
     this.chatHistory = [];
-    this.userSentiments = {}; // Track user sentiments
     this.isCollecting = false;
     this.collectionStartTime = null;
     this.widgetCreated = false;
@@ -44,6 +43,36 @@ class KickMoodMeter {
     
     // Load sentiment data from CSV
     this.loadSentimentData();
+    
+    // Set up URL change listener
+    this.setupUrlChangeListener();
+  }
+  
+  setupUrlChangeListener() {
+    // Track the current URL
+    this.currentUrl = window.location.href;
+    
+    // Watch for URL changes
+    setInterval(() => {
+      if (this.currentUrl !== window.location.href) {
+        this.currentUrl = window.location.href;
+        
+        // Update channel name in widget
+        this.updateChannelInfo();
+        
+        // Reset and restart collection
+        this.chatHistory = [];
+        if (this.isCollecting) {
+          clearInterval(this.collectionInterval);
+          this.isCollecting = false;
+        }
+        
+        // Start new collection for new channel
+        setTimeout(() => {
+          this.startCollection();
+        }, 1000);
+      }
+    }, 1000);
   }
   
   async loadSentimentData() {
@@ -156,23 +185,6 @@ class KickMoodMeter {
       console.error('Error parsing CSV:', error);
     }
   }
-  
-  // fallbackToOriginalDictionaries() {
-  //   console.log('Falling back to original dictionaries');
-  //   // Predefined sentiment dictionaries from original code
-  //   this.positiveWords = [
-  //     'pog', 'poggers', 'pogchamp', 'based', 'W', 'fire', 'sick', 
-  //     'amazing', 'awesome', 'epic', 'great', 'love', 'hype', 
-  //     'legendary', 'insane', 'incredible', 'nice', 'awesome', 
-  //     'fantastic', 'woohoo', 'yes', 'good', 'best', 'perfect'
-  //   ];
-
-  //   this.negativeWords = [
-  //     'L', 'trash', 'bad', 'worst', 'cringe', 'fail', 'terrible', 
-  //     'awful', 'stupid', 'dumb', 'sad', 'mad', 'angry', 'hate', 
-  //     'boring', 'meh', 'garbage', 'terrible', 'wtf', 'bruh', 'no'
-  //   ];
-  // }
 
   getChannelName() {
     // Extract channel name from URL
@@ -230,9 +242,6 @@ class KickMoodMeter {
     let totalMessages = messages.length;
     
     if (totalMessages === 0) return { mood: 'Waiting for chat...', level: 2 };
-
-    // Reset user sentiments for this analysis session
-    this.userSentiments = {};
     
     messages.forEach(message => {
       let messageScore = 0;
@@ -282,48 +291,11 @@ class KickMoodMeter {
       }
 
       sentimentScore += messageScore;
-      
-      // Update user's sentiment tracking
-      if (!this.userSentiments[message.username]) {
-        this.userSentiments[message.username] = {
-          totalScore: 0,
-          messageCount: 0,
-          averageScore: 0
-        };
-      }
-      
-      this.userSentiments[message.username].totalScore += messageScore;
-      this.userSentiments[message.username].messageCount += 1;
-      this.userSentiments[message.username].averageScore = 
-        this.userSentiments[message.username].totalScore / this.userSentiments[message.username].messageCount;
-    });
-
-    // Find most positive and most toxic users
-    let mostPositiveUser = { username: 'None', score: -Infinity };
-    let mostToxicUser = { username: 'None', score: Infinity };
-    
-    Object.entries(this.userSentiments).forEach(([username, data]) => {
-      // Only consider users who sent at least 2 messages
-      if (data.messageCount >= 2) {
-        if (data.averageScore > mostPositiveUser.score) {
-          mostPositiveUser = { username, score: data.averageScore };
-        }
-        
-        if (data.averageScore < mostToxicUser.score) {
-          mostToxicUser = { username, score: data.averageScore };
-        }
-      }
     });
 
     // Normalize sentiment score
     const normalizedScore = sentimentScore / totalMessages;
     const moodObj = this.interpretMood(normalizedScore);
-    
-    // Add user data to the mood object
-    moodObj.mostPositiveUser = mostPositiveUser.username;
-    moodObj.mostToxicUser = mostToxicUser.username;
-    moodObj.positiveScore = mostPositiveUser.score.toFixed(1);
-    moodObj.toxicScore = mostToxicUser.score.toFixed(1);
 
     return moodObj;
   }
@@ -381,9 +353,9 @@ class KickMoodMeter {
       
       this.chatHistory = [...this.chatHistory, ...uniqueNewMessages];
       
-      // Update collecting status on overlay
+      // Update calculating status on overlay (just show it's calculating, not message count)
       const timeRemaining = Math.max(0, 10 - Math.floor((Date.now() - this.collectionStartTime) / 1000));
-      this.updateCalculatingOverlay(`Analyzing chat in ${timeRemaining} seconds (${this.chatHistory.length} messages)`);
+      this.updateCalculatingOverlay(`Analyzing chat in ${timeRemaining} seconds...`);
       
       // If 10 seconds have passed, analyze and stop collection
       if (Date.now() - this.collectionStartTime >= 10000) {
@@ -521,17 +493,23 @@ class KickMoodMeter {
     chrome.runtime.sendMessage({ 
       mood: moodObj.mood, 
       level: moodObj.level,
-      explanation: explanation,
-      mostPositiveUser: moodObj.mostPositiveUser,
-      mostToxicUser: moodObj.mostToxicUser,
-      positiveScore: moodObj.positiveScore,
-      toxicScore: moodObj.toxicScore
+      explanation: explanation
     });
     
     // Schedule next collection after specified interval
     // Convert minutes to milliseconds
     const updateFrequencyMs = parseInt(this.settings.updateFrequency) * 60 * 1000 || 300000; // Default to 5 minutes
     setTimeout(() => this.startCollection(), updateFrequencyMs);
+  }
+  
+  updateChannelInfo() {
+    const widget = document.getElementById('kick-mood-widget');
+    if (widget) {
+      const channelHeader = widget.querySelector('.channel-header');
+      if (channelHeader) {
+        channelHeader.textContent = this.getChannelName();
+      }
+    }
   }
 
   createOrUpdateWidget(moodObj, explanation) {
@@ -628,128 +606,54 @@ class KickMoodMeter {
       moodWrapper.appendChild(moodIndicator);
       widget.appendChild(moodWrapper);
       
-      // Add user sentiment section
-      const userSentimentContainer = document.createElement('div');
-      userSentimentContainer.id = 'user-sentiment-container';
-      userSentimentContainer.style.cssText = `
-        margin-top: 12px;
-        padding-top: 10px;
-        border-top: 1px solid rgba(255, 255, 255, 0.2);
-      `;
-      
-      // User sentiment title
-      const userSentimentTitle = document.createElement('div');
-      userSentimentTitle.style.cssText = `
-        font-size: 12px;
-        font-weight: bold;
-        text-align: center;
-        margin-bottom: 8px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: rgba(255, 255, 255, 0.7);
-      `;
-      userSentimentTitle.textContent = 'Top Users';
-      userSentimentContainer.appendChild(userSentimentTitle);
-      
-      // Positive user
-      const positiveUserContainer = document.createElement('div');
-      positiveUserContainer.className = 'user-sentiment-item';
-      positiveUserContainer.style.cssText = `
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 5px;
-        padding: 5px 8px;
-        background-color: rgba(75, 181, 67, 0.15);
-        border-radius: 4px;
-      `;
-      
-      const positiveUserLabel = document.createElement('div');
-      positiveUserLabel.className = 'user-sentiment-label';
-      positiveUserLabel.style.cssText = `
-        font-size: 11px;
-        color: rgba(255, 255, 255, 0.9);
-      `;
-      positiveUserLabel.innerHTML = '😄 <span id="most-positive-user">N/A</span>';
-      
-      const positiveScoreLabel = document.createElement('div');
-      positiveScoreLabel.className = 'user-sentiment-score';
-      positiveScoreLabel.style.cssText = `
-        font-size: 11px;
-        color: rgb(75, 181, 67);
-        font-weight: bold;
-      `;
-      positiveScoreLabel.id = 'positive-user-score';
-      positiveScoreLabel.textContent = 'N/A';
-      
-      positiveUserContainer.appendChild(positiveUserLabel);
-      positiveUserContainer.appendChild(positiveScoreLabel);
-      userSentimentContainer.appendChild(positiveUserContainer);
-      
-      // Toxic user
-      const toxicUserContainer = document.createElement('div');
-      toxicUserContainer.className = 'user-sentiment-item';
-      toxicUserContainer.style.cssText = `
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 5px 8px;
-        background-color: rgba(231, 76, 60, 0.15);
-        border-radius: 4px;
-      `;
-      
-      const toxicUserLabel = document.createElement('div');
-      toxicUserLabel.className = 'user-sentiment-label';
-      toxicUserLabel.style.cssText = `
-        font-size: 11px;
-        color: rgba(255, 255, 255, 0.9);
-      `;
-      toxicUserLabel.innerHTML = '😡 <span id="most-toxic-user">N/A</span>';
-      
-      const toxicScoreLabel = document.createElement('div');
-      toxicScoreLabel.className = 'user-sentiment-score';
-      toxicScoreLabel.style.cssText = `
-        font-size: 11px;
-        color: rgb(231, 76, 60);
-        font-weight: bold;
-      `;
-      toxicScoreLabel.id = 'toxic-user-score';
-      toxicScoreLabel.textContent = 'N/A';
-      
-      toxicUserContainer.appendChild(toxicUserLabel);
-      toxicUserContainer.appendChild(toxicScoreLabel);
-      userSentimentContainer.appendChild(toxicUserContainer);
-      
-      widget.appendChild(userSentimentContainer);
-      
       // Add drag functionality with double-click activation
       let isDragging = false;
       let offsetX, offsetY;
       
+      // Double-click to enable drag mode
       widget.addEventListener('dblclick', (e) => {
-        // Highlight the widget border to indicate it can be moved
-        widget.style.boxShadow = '0 0 0 3pxrgb(23, 214, 29)';
+        e.preventDefault(); // Prevent text selection
         
-        // Allow for dragging immediately after double-click
-        isDragging = true;
-        offsetX = e.clientX - widget.getBoundingClientRect().left;
-        offsetY = e.clientY - widget.getBoundingClientRect().top;
+        // Toggle dragging mode
+        isDragging = !isDragging;
         
-        // Auto-disable dragging mode after 5 seconds
-        setTimeout(() => {
+        if (isDragging) {
+          // Set green border to indicate draggable state
+          widget.style.boxShadow = '0 0 0 3px rgb(23, 214, 29)';
+          widget.style.cursor = 'move';
+          
+          // Get initial mouse position relative to widget
+          const rect = widget.getBoundingClientRect();
+          offsetX = e.clientX - rect.left;
+          offsetY = e.clientY - rect.top;
+          
+          // Auto-disable dragging mode after 10 seconds if not used
+          setTimeout(() => {
+            if (isDragging) {
+              isDragging = false;
+              widget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.3)';
+              widget.style.cursor = 'default';
+            }
+          }, 10000);
+        } else {
+          // Disable dragging mode
           widget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.3)';
-          isDragging = false;
-        }, 5000);
+          widget.style.cursor = 'default';
+        }
       });
       
+      // Move the widget when dragging
       document.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
+        
+        // Update widget position
         widget.style.left = (e.clientX - offsetX) + 'px';
         widget.style.top = (e.clientY - offsetY) + 'px';
         widget.style.right = 'auto';
         widget.style.bottom = 'auto';
       });
       
+      // Stop dragging when mouse button is released
       document.addEventListener('mouseup', () => {
         if (isDragging) {
           // Save the current position for persistence
@@ -763,44 +667,17 @@ class KickMoodMeter {
         }
       });
       
-      // End dragging if user clicks anywhere else
-      document.addEventListener('click', (e) => {
-        if (isDragging && !widget.contains(e.target)) {
+      // End dragging if escape key is pressed
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && isDragging) {
           isDragging = false;
           widget.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.3)';
+          widget.style.cursor = 'default';
         }
       });
       
       document.body.appendChild(widget);
       this.widgetCreated = true;
-    }
-    
-    // Update user sentiment information
-    if (moodObj.mostPositiveUser) {
-      const positiveUserElement = document.getElementById('most-positive-user');
-      const positiveScoreElement = document.getElementById('positive-user-score');
-      
-      if (positiveUserElement) {
-        positiveUserElement.textContent = moodObj.mostPositiveUser;
-      }
-      
-      if (positiveScoreElement) {
-        const scoreDisplay = parseFloat(moodObj.positiveScore) > 0 ? `+${moodObj.positiveScore}` : moodObj.positiveScore;
-        positiveScoreElement.textContent = scoreDisplay;
-      }
-    }
-    
-    if (moodObj.mostToxicUser) {
-      const toxicUserElement = document.getElementById('most-toxic-user');
-      const toxicScoreElement = document.getElementById('toxic-user-score');
-      
-      if (toxicUserElement) {
-        toxicUserElement.textContent = moodObj.mostToxicUser;
-      }
-      
-      if (toxicScoreElement) {
-        toxicScoreElement.textContent = moodObj.toxicScore;
-      }
     }
     
     // Update mood indicator position
@@ -815,11 +692,6 @@ class KickMoodMeter {
     widget.style.display = 'block';
     widget.style.opacity = '1';
   }
-  
-
-
-
-
   
   toggleWidget() {
     const widget = document.getElementById('kick-mood-widget');
@@ -846,7 +718,7 @@ class KickMoodMeter {
     if (widget) {
       // Apply transparency
       const transparency = this.settings.transparency;
-      widget.style.backgroundColor = `rgba(30, 30, 30, ${(100 - transparency) / 100})`;
+      widget.style.backgroundColor = `rgba(0, 0, 0, ${(100 - transparency) / 100})`;
     }
   }
 }
@@ -871,11 +743,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       mood: moodObj.mood, 
       level: moodObj.level, 
       explanation: explanation,
-      isVisible: !!document.getElementById('kick-mood-widget')?.style.display !== 'none',
-      mostPositiveUser: moodObj.mostPositiveUser,
-      mostToxicUser: moodObj.mostToxicUser,
-      positiveScore: moodObj.positiveScore,
-      toxicScore: moodObj.toxicScore
+      isVisible: !!document.getElementById('kick-mood-widget')?.style.display !== 'none'
     });
   } 
   else if (request.action === 'toggleWidget') {
