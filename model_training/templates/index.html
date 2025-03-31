@@ -1,0 +1,77 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Kick Chat Sentiment Labeler</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+    <div class="container">
+        <h1>Kick Chat Sentiment Labeler</h1>
+        
+        <div class="card">
+            <h2>Enter Channel URL</h2>
+            <form action="/scrape" method="post">
+                <input type="text" name="url" placeholder="https://kick.com/channel" required>
+                <button type="submit">Scrape Chat Messages</button>
+            </form>
+        </div>
+        
+        <div class="card">
+            <h2>Model Status</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-label">Labeled Batches:</span>
+                    <span class="stat-value">{{ batch_count }}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Total Labeled Messages:</span>
+                    <span class="stat-value">{{ total_labeled }}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Model Status:</span>
+                    <span class="stat-value">{{ "Trained" if model_trained else "Not Trained" }}</span>
+                </div>
+                {% if model_trained %}
+                <div class="stat-item">
+                    <span class="stat-label">Model Accuracy:</span>
+                    <span class="stat-value">{{ model_accuracy }}%</span>
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="model-training">
+                <form action="/train_model" method="post">
+                    <button type="submit" {% if total_labeled < 20 %}disabled{% endif %}>
+                        {{ "Update Model" if model_trained else "Train Model" }}
+                    </button>
+                </form>
+                {% if total_labeled < 20 %}
+                <div class="training-note">Need at least 20 labeled messages to train model</div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>Channels</h2>
+            {% if channels %}
+                <ul class="channel-list">
+                    {% for channel_name, channel_data in channels.items() %}
+                    <li>
+                        <a href="/channel/{{ channel_name }}">{{ channel_name }}</a>
+                        <div class="channel-stats">
+                            <span class="badge">{{ channel_data.messages|length }} messages</span>
+                            <span class="badge batch-badge">{{ channel_data.batches|length }} batches</span>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="no-channels">No channels scraped yet. Enter a URL above to get started.</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
+        

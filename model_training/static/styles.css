@@ -1,0 +1,389 @@
+
+/* General Styles */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+body {
+    background-color: #f5f5f5;
+    color: #333;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 30px;
+    color: #2c3e50;
+}
+
+h2 {
+    margin-bottom: 15px;
+    color: #34495e;
+}
+
+h3 {
+    margin-bottom: 10px;
+    color: #34495e;
+    font-size: 1.1rem;
+}
+
+/* Card Styles */
+.card {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+/* Form Styles */
+form {
+    display: flex;
+    flex-direction: column;
+}
+
+input[type="text"] {
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+    margin-bottom: 15px;
+}
+
+button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: #2980b9;
+}
+
+button:disabled {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+}
+
+/* Channel List */
+.channel-list {
+    list-style: none;
+}
+
+.channel-list li {
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.channel-list li:last-child {
+    border-bottom: none;
+}
+
+.channel-list a {
+    color: #3498db;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 1.1rem;
+}
+
+.channel-stats {
+    display: flex;
+    gap: 8px;
+}
+
+.badge {
+    background-color: #3498db;
+    color: white;
+    border-radius: 12px;
+    padding: 3px 10px;
+    font-size: 12px;
+}
+
+.batch-badge {
+    background-color: #9b59b6;
+}
+
+/* Stats Grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.stat-item {
+    border: 1px solid #eee;
+    border-radius: 6px;
+    padding: 15px;
+    background-color: #f8f9fa;
+}
+
+.stat-label {
+    display: block;
+    font-size: 0.9rem;
+    color: #7f8c8d;
+    margin-bottom: 5px;
+}
+
+.stat-value {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.model-training {
+    margin-top: 20px;
+}
+
+.training-note {
+    margin-top: 10px;
+    color: #7f8c8d;
+    font-size: 0.9rem;
+    font-style: italic;
+}
+
+.no-channels {
+    color: #7f8c8d;
+    font-style: italic;
+}
+
+/* Message List Styles */
+.message-list {
+    margin-bottom: 20px;
+    max-height: 500px;
+    overflow-y: auto;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    padding: 10px;
+}
+
+.message-item {
+    border-bottom: 1px solid #eee;
+    padding: 12px;
+    margin-bottom: 0;
+    background-color: #fff;
+}
+
+.message-item:last-child {
+    border-bottom: none;
+}
+
+.message-header {
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.username {
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.message-content {
+    margin-bottom: 5px;
+    word-break: break-word;
+}
+
+/* Batch Controls */
+.batch-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.refresh-form button {
+    background-color: #27ae60;
+}
+
+.refresh-form button:hover {
+    background-color: #219653;
+}
+
+/* Batch Sentiment */
+.batch-sentiment {
+    margin: 20px 0;
+}
+
+.sentiment-range-container {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+    gap: 10px;
+}
+
+.sentiment-range {
+    flex: 1;
+    height: 10px;
+}
+
+.sentiment-value-display {
+    text-align: center;
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 20px;
+}
+
+.sentiment-description {
+    display: inline-block;
+    padding: 5px 15px;
+    border-radius: 20px;
+    margin-top: 5px;
+    background-color: #f39c12;
+    color: white;
+}
+
+.submit-batch {
+    margin-top: 10px;
+    background-color: #e74c3c;
+    font-weight: bold;
+}
+
+.submit-batch:hover {
+    background-color: #c0392b;
+}
+
+/* Batches List */
+.batches-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.batch-item {
+    border: 1px solid #eee;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 15px;
+    background-color: #f9f9f9;
+}
+
+.batch-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.batch-timestamp {
+    font-size: 0.9rem;
+    color: #7f8c8d;
+}
+
+.batch-count {
+    font-size: 0.9rem;
+    color: #7f8c8d;
+}
+
+.batch-messages-preview {
+    border-top: 1px solid #eee;
+    padding-top: 10px;
+}
+
+.message-preview {
+    padding: 5px 0;
+    font-size: 0.9rem;
+}
+
+.message-text {
+    color: #555;
+}
+
+.message-more {
+    text-align: center;
+    font-style: italic;
+    color: #7f8c8d;
+    margin-top: 5px;
+    font-size: 0.9rem;
+}
+
+/* Sentiment Indicators */
+.very-negative {
+    background-color: #c0392b;
+    color: white;
+}
+
+.negative {
+    background-color: #e74c3c;
+    color: white;
+}
+
+.neutral {
+    background-color: #f39c12;
+    color: white;
+}
+
+.positive {
+    background-color: #27ae60;
+    color: white;
+}
+
+.very-positive {
+    background-color: #2ecc71;
+    color: white;
+}
+
+/* Back link */
+.back-link {
+    display: inline-block;
+    margin-bottom: 20px;
+    color: #3498db;
+    text-decoration: none;
+}
+
+/* Sentiment Results */
+.batch-prediction {
+    margin-bottom: 20px;
+    padding: 15px;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    background-color: #f8f9fa;
+}
+
+.messages-predictions {
+    margin-top: 20px;
+}
+
+.message-prediction {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.message-prediction:last-child {
+    border-bottom: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .batch-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .sentiment-range-container {
+        flex-direction: column;
+    }
+}
+        

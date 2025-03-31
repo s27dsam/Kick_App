@@ -96,7 +96,7 @@
       margin-bottom: 15px;
     }
     
-    #customizationPanel {
+    #customizationPanel, #feedbackPanel {
       display: none;
     }
     
@@ -234,6 +234,155 @@
       text-align: center;
       margin-top: 5px;
     }
+    
+    /* New CSS for feedback panel */
+    #trainModelBtn {
+      background-color: #9c27b0;
+    }
+    
+    #trainModelBtn:hover {
+      background-color: #ba68c8;
+    }
+    
+    .panel-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 15px;
+      background-color: rgba(255, 255, 255, 0.1);
+      padding: 8px;
+      border-radius: 4px;
+    }
+    
+    .back-button {
+      background: none;
+      border: none;
+      color: white;
+      cursor: pointer;
+      margin-right: 10px;
+      display: flex;
+      align-items: center;
+      padding: 0;
+    }
+    
+    .back-button:hover {
+      color: #4A90E2;
+    }
+    
+    .header-title {
+      flex-grow: 1;
+      font-size: 14px;
+      text-align: center;
+    }
+    
+    .chat-messages {
+      max-height: 250px;
+      overflow-y: auto;
+      margin-bottom: 15px;
+      background-color: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+      padding: 8px;
+    }
+    
+    .chat-message {
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .chat-message:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+    
+    .chat-username {
+      font-weight: bold;
+      font-size: 13px;
+      margin-bottom: 2px;
+    }
+    
+    .chat-text {
+      font-size: 13px;
+      margin-bottom: 5px;
+      word-break: break-word;
+    }
+    
+    .mood-selector {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      margin-bottom: 15px;
+    }
+    
+    .mood-title {
+      font-weight: bold;
+      margin-bottom: 8px;
+      width: 100%;
+    }
+    
+    .mood-option {
+      margin-bottom: 5px;
+      position: relative;
+    }
+    
+    .mood-option input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      cursor: pointer;
+    }
+    
+    .mood-option label {
+      display: inline-block;
+      padding: 5px 10px;
+      cursor: pointer;
+      background-color: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      transition: all 0.3s;
+    }
+    
+    .mood-option input[type="radio"]:checked + label {
+      background-color: #4A90E2;
+      box-shadow: 0 0 5px rgba(74, 144, 226, 0.5);
+    }
+    
+    .feedback-actions {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 15px;
+    }
+    
+    .feedback-actions button {
+      padding: 8px 15px;
+    }
+    
+    #submitFeedbackBtn {
+      background-color: #4caf50;
+      flex-grow: 2;
+    }
+    
+    #exportFeedbackBtn {
+      background-color: #ff9800;
+      flex-grow: 1;
+    }
+    
+    .feedback-note {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #aaa;
+      text-align: center;
+    }
+    
+    /* Styles for animation */
+    @keyframes flash {
+      0% { background-color: rgba(255, 255, 255, 0.1); }
+      50% { background-color: rgba(74, 144, 226, 0.3); }
+      100% { background-color: rgba(255, 255, 255, 0.1); }
+    }
+    
+    .flash {
+      animation: flash 0.5s;
+    }
   </style>
 </head>
 <body>
@@ -287,6 +436,14 @@
           <polygon points="10 8 16 12 10 16 10 8"></polygon>
         </svg>
         Collect Chat Now
+      </button>
+      
+      <button id="trainModelBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+          <path d="M15 9h0"></path>
+        </svg>
+        Train Sentiment Model
       </button>
       
       <button id="settingsBtn">
@@ -343,6 +500,86 @@
         </svg>
         Save Settings
       </button>
+    </div>
+  </div>
+  
+  <!-- New Feedback Panel for training the sentiment model -->
+  <div id="feedbackPanel">
+    <div class="panel-header">
+      <button id="backFromFeedbackBtn" class="back-button">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m12 19-7-7 7-7"></path>
+          <path d="M19 12H5"></path>
+        </svg>
+      </button>
+      <div class="header-title">Train Sentiment Model</div>
+    </div>
+    
+    <div id="chatMessagesContainer" class="chat-messages">
+      <!-- Chat messages will be loaded here dynamically -->
+      <div class="loading-message">Loading chat messages...</div>
+    </div>
+    
+    <div class="mood-selector">
+      <div class="mood-title">Select the overall chat mood:</div>
+      
+      <div class="mood-option">
+        <input type="radio" id="mood-hype" name="chatMood" value="HYPE">
+        <label for="mood-hype">HYPE</label>
+      </div>
+      
+      <div class="mood-option">
+        <input type="radio" id="mood-positive" name="chatMood" value="Positive">
+        <label for="mood-positive">Positive</label>
+      </div>
+      
+      <div class="mood-option">
+        <input type="radio" id="mood-slightly-positive" name="chatMood" value="Slightly Positive">
+        <label for="mood-slightly-positive">Slightly Positive</label>
+      </div>
+      
+      <div class="mood-option">
+        <input type="radio" id="mood-neutral" name="chatMood" value="Neutral">
+        <label for="mood-neutral">Neutral</label>
+      </div>
+      
+      <div class="mood-option">
+        <input type="radio" id="mood-slightly-negative" name="chatMood" value="Slightly Negative">
+        <label for="mood-slightly-negative">Slightly Negative</label>
+      </div>
+      
+      <div class="mood-option">
+        <input type="radio" id="mood-negative" name="chatMood" value="Negative">
+        <label for="mood-negative">Negative</label>
+      </div>
+      
+      <div class="mood-option">
+        <input type="radio" id="mood-toxic" name="chatMood" value="TOXIC">
+        <label for="mood-toxic">TOXIC</label>
+      </div>
+    </div>
+    
+    <div class="feedback-actions">
+      <button id="submitFeedbackBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14"></path>
+          <path d="m12 5 7 7-7 7"></path>
+        </svg>
+        Submit Feedback
+      </button>
+      
+      <button id="exportFeedbackBtn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        Export
+      </button>
+    </div>
+    
+    <div class="feedback-note">
+      Your feedback helps improve sentiment analysis for all users. Thank you for contributing!
     </div>
   </div>
 

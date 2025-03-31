@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Kick Mood Meter",
-  "version": "1.0",
-  "description": "Analyzes chat sentiment on Kick streams with a live on-screen widget",
+  "version": "1.1.0",
+  "description": "Analyzes chat sentiment on Kick streams with a live on-screen widget and trainable model",
   "permissions": [
     "activeTab",
     "storage",
-    "tabs"
+    "tabs",
+    "downloads"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -14,11 +15,7 @@
       "64": "images/happy_64.png",
       "32": "images/happy_32.png",
       "16": "images/happy_16.png"
-
     }
-
-
-    
   },
   "content_scripts": [
     {
