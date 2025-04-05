@@ -383,6 +383,184 @@
     .flash {
       animation: flash 0.5s;
     }
+    
+    /* New styles for message labeling interface */
+    .message-card {
+      background-color: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      padding: 15px;
+      margin: 15px 0;
+      min-height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.3s, box-shadow 0.3s;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+    
+    .message-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    .message-card-inner {
+      width: 100%;
+    }
+    
+    .message-card-username {
+      font-weight: bold;
+      color: #4A90E2;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    
+    .message-card-text {
+      font-size: 14px;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+    
+    .sentiment-buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 15px;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    
+    .sentiment-btn {
+      flex: 1;
+      min-width: 80px;
+      padding: 8px 5px;
+      border: none;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      font-size: 13px;
+    }
+    
+    .sentiment-btn svg {
+      margin-right: 8px;
+    }
+    
+    .sentiment-btn.positive {
+      background-color: rgba(76, 175, 80, 0.2);
+      color: #4caf50;
+      border: 1px solid rgba(76, 175, 80, 0.3);
+    }
+    
+    .sentiment-btn.positive:hover {
+      background-color: rgba(76, 175, 80, 0.3);
+    }
+    
+    .sentiment-btn.neutral {
+      background-color: rgba(33, 150, 243, 0.2);
+      color: #2196f3;
+      border: 1px solid rgba(33, 150, 243, 0.3);
+    }
+    
+    .sentiment-btn.neutral:hover {
+      background-color: rgba(33, 150, 243, 0.3);
+    }
+    
+    .sentiment-btn.negative {
+      background-color: rgba(244, 67, 54, 0.2);
+      color: #f44336;
+      border: 1px solid rgba(244, 67, 54, 0.3);
+    }
+    
+    .sentiment-btn.negative:hover {
+      background-color: rgba(244, 67, 54, 0.3);
+    }
+    
+    .labeling-progress {
+      margin-bottom: 15px;
+    }
+    
+    .progress-bar-container {
+      height: 6px;
+      background-color: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 5px;
+    }
+    
+    .progress-bar {
+      height: 100%;
+      background-color: #4A90E2;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+    
+    .progress-stats {
+      font-size: 12px;
+      color: #aaa;
+      text-align: center;
+    }
+    
+    .skip-btn {
+      flex: 0 0 auto;
+      background-color: #555;
+      color: #ddd;
+      padding: 8px 15px;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      margin-right: 8px;
+    }
+    
+    .skip-btn:hover {
+      background-color: #666;
+    }
+    
+    /* Card swipe animation */
+    @keyframes swipeRight {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(300px); opacity: 0; }
+    }
+    
+    @keyframes swipeLeft {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(-300px); opacity: 0; }
+    }
+    
+    @keyframes swipeDown {
+      from { transform: translateY(0); opacity: 1; }
+      to { transform: translateY(100px); opacity: 0; }
+    }
+    
+    .swipe-right {
+      animation: swipeRight 0.3s forwards;
+    }
+    
+    .swipe-left {
+      animation: swipeLeft 0.3s forwards;
+    }
+    
+    .swipe-down {
+      animation: swipeDown 0.3s forwards;
+    }
+    
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 20px;
+      color: #aaa;
+    }
+    
+    .empty-state svg {
+      width: 40px;
+      height: 40px;
+      margin-bottom: 10px;
+      color: #666;
+    }
   </style>
 </head>
 <body>
@@ -515,57 +693,61 @@
       <div class="header-title">Train Sentiment Model</div>
     </div>
     
-    <div id="chatMessagesContainer" class="chat-messages">
-      <!-- Chat messages will be loaded here dynamically -->
-      <div class="loading-message">Loading chat messages...</div>
+    <div id="messageCard" class="message-card">
+      <!-- Current message to label will be shown here -->
+      <div class="message-card-inner">
+        <div class="message-card-username">Loading messages...</div>
+        <div class="message-card-text">Please wait...</div>
+      </div>
     </div>
     
-    <div class="mood-selector">
-      <div class="mood-title">Select the overall chat mood:</div>
+    <div class="sentiment-buttons">
+      <button id="btnPositive" class="sentiment-btn positive">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+          <line x1="9" y1="9" x2="9.01" y2="9"></line>
+          <line x1="15" y1="9" x2="15.01" y2="9"></line>
+        </svg>
+        Positive
+      </button>
       
-      <div class="mood-option">
-        <input type="radio" id="mood-hype" name="chatMood" value="HYPE">
-        <label for="mood-hype">HYPE</label>
+      <button id="btnNeutral" class="sentiment-btn neutral">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="8" y1="15" x2="16" y2="15"></line>
+          <line x1="9" y1="9" x2="9.01" y2="9"></line>
+          <line x1="15" y1="9" x2="15.01" y2="9"></line>
+        </svg>
+        Neutral
+      </button>
+      
+      <button id="btnNegative" class="sentiment-btn negative">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M16 16s-1.5-2-4-2-4 2-4 2"></path>
+          <line x1="9" y1="9" x2="9.01" y2="9"></line>
+          <line x1="15" y1="9" x2="15.01" y2="9"></line>
+        </svg>
+        Negative
+      </button>
+    </div>
+    
+    <div id="labelingProgress" class="labeling-progress">
+      <div class="progress-bar-container">
+        <div id="progressBar" class="progress-bar" style="width: 0%"></div>
       </div>
-      
-      <div class="mood-option">
-        <input type="radio" id="mood-positive" name="chatMood" value="Positive">
-        <label for="mood-positive">Positive</label>
-      </div>
-      
-      <div class="mood-option">
-        <input type="radio" id="mood-slightly-positive" name="chatMood" value="Slightly Positive">
-        <label for="mood-slightly-positive">Slightly Positive</label>
-      </div>
-      
-      <div class="mood-option">
-        <input type="radio" id="mood-neutral" name="chatMood" value="Neutral">
-        <label for="mood-neutral">Neutral</label>
-      </div>
-      
-      <div class="mood-option">
-        <input type="radio" id="mood-slightly-negative" name="chatMood" value="Slightly Negative">
-        <label for="mood-slightly-negative">Slightly Negative</label>
-      </div>
-      
-      <div class="mood-option">
-        <input type="radio" id="mood-negative" name="chatMood" value="Negative">
-        <label for="mood-negative">Negative</label>
-      </div>
-      
-      <div class="mood-option">
-        <input type="radio" id="mood-toxic" name="chatMood" value="TOXIC">
-        <label for="mood-toxic">TOXIC</label>
+      <div class="progress-stats">
+        <span id="labeledCount">0</span> of <span id="totalCount">0</span> messages labeled
       </div>
     </div>
     
     <div class="feedback-actions">
-      <button id="submitFeedbackBtn">
+      <button id="skipMessageBtn" class="skip-btn">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M5 12h14"></path>
-          <path d="m12 5 7 7-7 7"></path>
+          <path d="m9 18 6-6-6-6"></path>
         </svg>
-        Submit Feedback
+        Skip
       </button>
       
       <button id="exportFeedbackBtn">
@@ -574,7 +756,7 @@
           <polyline points="7 10 12 15 17 10"></polyline>
           <line x1="12" y1="15" x2="12" y2="3"></line>
         </svg>
-        Export
+        Export Labeled Data
       </button>
     </div>
     

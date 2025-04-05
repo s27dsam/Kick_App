@@ -16,13 +16,21 @@ Kick Mood Meter helps streamers and viewers understand the overall sentiment of 
 - **Detailed Statistics**: Provides percentage breakdowns of positive, neutral, and negative sentiment
 - **Customizable Settings**: Adjust widget transparency and update frequency
 - **Easy Positioning**: Double-click to enable drag mode and position the widget anywhere on screen
+- **Training Mode**: Label messages to improve the sentiment model
+
+## Project Structure
+
+- **Chrome Extension Files**:
+  - `manifest.json`: Extension configuration
+  - `popup.html/js`: Extension popup interface
+  - `content.js`: Main logic for analyzing chat and displaying the widget
+  - `images/`: Extension icons and graphics
+
+- **Model Training**:
+  - `model_training/`: Tools for training and exporting the sentiment model
+  - `model_training/README.md`: Detailed instructions for model training
 
 ## Installation
-
-1. Download the extension from the Chrome Web Store (link coming soon)
-2. Click "Add to Chrome" to install
-3. Navigate to any Kick.com channel page
-4. The Mood Meter widget will automatically appear on the page
 
 ### Manual Installation (Developer Mode)
 
@@ -32,38 +40,46 @@ Kick Mood Meter helps streamers and viewers understand the overall sentiment of 
 4. Click "Load unpacked" and select the extension directory
 5. Navigate to any Kick.com channel page to see the widget in action
 
+## Using the Extension
+
 ### Viewing Sentiment Data
 
 - The widget automatically appears on any Kick.com channel page
 - The mood meter shows the current sentiment level from positive (left) to negative (right)
-- Hover over the widget to see more detailed information
+- Click the extension icon to see detailed statistics
 
 ### Widget Controls
 
-- **Show/Hide**: Click the extension icon and use the toggle button to show or hide the widget
-- **Positioning**: Double-click the widget to enter drag mode (indicated by a green border), then drag it to your preferred location
+- **Show/Hide**: Use the toggle button to show or hide the widget
+- **Collect Chat**: Manually trigger collection and analysis of current chat
+- **Positioning**: Double-click the widget to enter drag mode, then drag it to your preferred location
 - **Exit Drag Mode**: Double-click again or press ESC
 
-### Settings Customization
+### Training the Sentiment Model
 
-1. Click the extension icon in your browser toolbar
-2. Click the "Settings" button
-3. Adjust the following options:
-   - **Background Transparency**: Control the opacity of the widget background
-   - **Update Frequency**: Set how often the sentiment analysis refreshes (5-60 minutes)
-4. Click "Save Settings" to apply your changes
+1. Click the "Train Sentiment Model" button in the extension popup
+2. Label individual messages as Positive, Neutral, or Negative
+3. The labeled messages are stored locally
+4. Click "Export Labeled Data" to save a CSV file for model training
+
+## Training a Custom Sentiment Model
+
+See the [model training README](model_training/README.md) for detailed instructions on:
+- Using labeled data to train a new model
+- Converting the model for use in the extension
+- Deploying the updated model
 
 ## How It Works
 
-The extension analyzes chat messages using sentiment analysis techniques:
+The extension analyzes chat messages using machine learning-based sentiment analysis:
 
-1. **Data Collection**: Collects chat messages from the stream
-2. **Sentiment Analysis**: Processes messages using pre-labeled sentiment data
-3. **Mood Calculation**: Determines the overall mood based on the distribution of positive, neutral, and negative messages
+1. **Data Collection**: Collects and filters chat messages from the stream
+2. **Sentiment Analysis**: Processes messages using a trained model
+3. **Mood Calculation**: Determines the overall mood based on the distribution of sentiment
 4. **Visualization**: Updates the widget to reflect the current mood state
 
 ## Privacy
 
 - All analysis happens locally in your browser
 - No chat data is sent to external servers
-- No user data is collected or stored
+- No user data is collected or stored outside your browser storage

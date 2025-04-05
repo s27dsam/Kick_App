@@ -57,11 +57,38 @@ class KickMoodMeter {
       if (data.sentimentModel) {
         this.sentimentModel = data.sentimentModel;
         console.log('Loaded sentiment model from storage');
+      } else {
+        // Load the default model from the extension files
+        this.loadSentimentModel();
       }
     });
     
     // Set up URL change listener
     this.setupUrlChangeListener();
+  }
+  
+  // Method to load the sentiment model
+  loadSentimentModel() {
+    try {
+      // Fetch the sentiment model JSON file
+      fetch(chrome.runtime.getURL('sentiment_model.json'))
+        .then(response => response.json())
+        .then(modelData => {
+          console.log('Loaded sentiment model from extension files');
+          this.sentimentModel = modelData;
+          
+          // Save to storage for future use
+          chrome.storage.local.set({ sentimentModel: modelData });
+        })
+        .catch(error => {
+          console.error('Error loading sentiment model:', error);
+          // Fall back to the basic placeholder logic
+          this.sentimentModel = null;
+        });
+    } catch (error) {
+      console.error('Error in loadSentimentModel:', error);
+      this.sentimentModel = null;
+    }
   }
   
   setupUrlChangeListener() {
@@ -256,6 +283,8 @@ class KickMoodMeter {
     console.log(`Found ${messageElements.length} message elements`);
     
     const messages = [];
+    const seenMessages = new Set(); // Track unique messages to avoid duplicates
+    let skippedCount = 0;
     
     Array.from(messageElements).forEach((messageEl, index) => {
       // Get the username
@@ -264,59 +293,143 @@ class KickMoodMeter {
       
       // Get the message text
       const messageTextElement = messageEl.querySelector('div[class*="break-words"]');
-      const messageText = messageTextElement ? messageTextElement.textContent.trim().toLowerCase() : '';
+      let messageText = messageTextElement ? messageTextElement.textContent.trim().toLowerCase() : '';
       
-      if (messageText.length > 0) {
-        console.log(`Message ${index}: "${username}": "${messageText}"`);
-        
-        messages.push({
-          username: username,
-          message: messageText
-        });
+      // Skip empty messages early
+      if (!messageText || messageText.length === 0) {
+        skippedCount++;
+        return;
       }
+      
+      // Skip very short messages (1-2 characters)
+      if (messageText.length < 3) {
+        skippedCount++;
+        return;
+      }
+      
+      // Skip messages that are just URLs
+      if (messageText.match(/^https?:\/\/\S+$/i)) {
+        skippedCount++;
+        return;
+      }
+      
+      // Skip messages that are just numbers
+      if (messageText.match(/^\d+$/)) {
+        skippedCount++;
+        return;
+      }
+      
+      // Try to detect emoji-only messages (common in chat)
+      // This is an approximate check - Unicode emoji detection can be complex
+      const emojiPattern = /[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u;
+      const nonEmojiPattern = /[a-zA-Z0-9]/; // Check if there are actual alphanumeric characters
+      
+      // If message contains emojis but no alphanumeric characters, skip it
+      if (emojiPattern.test(messageText) && !nonEmojiPattern.test(messageText)) {
+        skippedCount++;
+        return;
+      }
+      
+      // Skip if message is too short after removing common emotes
+      const cleanedForLength = messageText
+        .replace(/kappa|pogchamp|lul|pepe|pog|omegalul|sadge|monkas|pepega|kekw|pepelaugh/g, '')
+        .trim();
+      
+      if (cleanedForLength.length < 3) {
+        skippedCount++;
+        return;
+      }
+      
+      // Create a unique identifier for this message to avoid duplicates
+      const messageKey = `${username}:${messageText}`;
+      
+      // Skip if we've already seen this exact message
+      if (seenMessages.has(messageKey)) {
+        skippedCount++;
+        return;
+      }
+      
+      // Mark this message as seen
+      seenMessages.add(messageKey);
+      
+      console.log(`Message ${index}: "${username}": "${messageText}"`);
+      
+      messages.push({
+        username: username,
+        message: messageText
+      });
     });
     
-    console.log(`Total messages extracted: ${messages.length}`);
+    console.log(`Total messages extracted: ${messages.length} (after filtering out ${skippedCount} empty/invalid messages)`);
     return messages;
   }
 
   // Methods for training model feedback
-  // Get chat messages for feedback panel
+  // Get chat messages for individual labeling
   getChatMessages() {
-    return this.chatHistory.slice(0, 100); // Limit to first 100 messages
+    // The messages should already be filtered at the extraction stage,
+    // but we'll do a second filtering here just to be absolutely certain
+    // no empty messages are shown to the user for labeling
+    const filteredMessages = this.chatHistory.filter(msg => {
+      // Skip empty messages
+      if (!msg.message || msg.message.trim() === '') return false;
+      
+      // Skip very short messages (require at least 3 characters)
+      if (msg.message.trim().length < 3) return false;
+      
+      // Skip messages that are just URLs
+      if (msg.message.trim().match(/^https?:\/\/\S+$/i)) return false;
+      
+      // Skip pure number messages
+      if (msg.message.trim().match(/^\d+$/)) return false;
+      
+      // Check if message only contains emoji (common in chat)
+      // This regex matches common emoji patterns
+      const emojiOnlyRegex = /^(\p{Emoji}|\s)+$/u;
+      if (emojiOnlyRegex.test(msg.message.trim())) return false;
+      
+      // Skip messages with just punctuation/symbols and no actual text
+      if (msg.message.trim().match(/^[^\w\s]*$/)) return false;
+      
+      // Skip messages that are mostly emotes after removing common chat emotes
+      const cleanedForEmotes = msg.message.trim()
+        .toLowerCase()
+        .replace(/kappa|pogchamp|lul|pepe|pog|omegalul|sadge|monkas|pepega|kekw|pepelaugh/g, '')
+        .trim();
+        
+      if (cleanedForEmotes.length < 3) return false;
+      
+      return true;
+    });
+    
+    console.log(`Second-stage filtering: ${this.chatHistory.length - filteredMessages.length} more messages filtered out`);
+    
+    // Return filtered messages for individual labeling
+    return filteredMessages; 
   }
 
-  // Handle chat feedback submission
-  submitChatFeedback(overallMood) {
-    // Create feedback entry
-    const feedbackEntry = {
-      timestamp: Date.now(),
-      channelName: this.getChannelName(),
-      originalMood: this.lastAnalyzedMood,
-      correctedMood: overallMood,
-      messageCount: this.chatHistory.length,
-      // Store word frequencies rather than actual messages (for privacy)
-      wordFrequencies: this.calculateWordFrequencies()
-    };
+  // Store labeled messages from popup
+  storeLabeledMessages(labeledMessages) {
+    // Combine with existing labeled messages
+    chrome.storage.local.get(['labeledMessages'], (data) => {
+      let allLabeledMessages = data.labeledMessages || [];
+      allLabeledMessages = [...allLabeledMessages, ...labeledMessages];
+      
+      // Limit to last 1000 to prevent storage issues
+      if (allLabeledMessages.length > 1000) {
+        allLabeledMessages = allLabeledMessages.slice(-1000);
+      }
+      
+      // Save back to storage
+      chrome.storage.local.set({ labeledMessages: allLabeledMessages });
+      
+      console.log(`Stored ${labeledMessages.length} newly labeled messages, total: ${allLabeledMessages.length}`);
+    });
     
-    // Add to feedback data
-    this.feedbackData.push(feedbackEntry);
-    
-    // Trim to keep size manageable (keep last 100 entries)
-    if (this.feedbackData.length > 100) {
-      this.feedbackData = this.feedbackData.slice(-100);
-    }
-    
-    // Save to storage
-    chrome.storage.local.set({ feedbackData: this.feedbackData });
-    
-    console.log('Feedback saved:', feedbackEntry);
-    
-    // Return success
     return { success: true };
   }
 
-  // Helper to calculate word frequencies from chat messages
+  // Helper to calculate word frequencies from chat messages (kept for reference)
   calculateWordFrequencies() {
     const wordCounts = {};
     
@@ -386,41 +499,158 @@ class KickMoodMeter {
     return moodObj;
   }
 
-  // New method to analyze sentiment of the entire batch
+  // Method to analyze sentiment of the entire batch using the trained model
   analyzeBatchSentiment(batchText) {
-    // This is where your sentiment_model.pkl integration will happen
-    // For now, using a simple placeholder that will be replaced by your model
+    // Clean and prepare the text
+    const cleanedText = this.cleanTextForPrediction(batchText);
     
     // If we have a model loaded
     if (this.sentimentModel) {
       try {
-        // This is where your actual model prediction would happen
-        // The model would analyze the entire batch of text at once
-        
-        // Placeholder logic - to be replaced with your model implementation
-        const positiveCount = (batchText.match(/good|great|awesome|amazing|pog|love|heart|win|gg/gi) || []).length;
-        const negativeCount = (batchText.match(/bad|terrible|awful|horrible|sad|lose|toxic|trash|lag/gi) || []).length;
-        
-        const ratio = positiveCount / (positiveCount + negativeCount + 0.1); // Avoid division by zero
-        
-        if (ratio > 0.7) return 'Positive'; 
-        else if (ratio > 0.5) return 'Slightly Positive';
-        else if (ratio < 0.3) return 'Negative';
-        else if (ratio < 0.5) return 'Slightly Negative';
-        else return 'Neutral';
+        // Use the machine learning model to predict sentiment
+        const sentiment = this.predictWithModel(cleanedText);
+        console.log(`Model prediction for batch text: ${sentiment}`);
+        return sentiment;
       } catch (error) {
         console.error('Error using sentiment model:', error);
         return 'Neutral'; // Fallback to neutral on error
       }
     }
     
-    // If no model is loaded yet, use random assignment (temporary)
-    const randomValue = Math.random();
-    if (randomValue > 0.7) return 'Positive';
-    else if (randomValue > 0.5) return 'Slightly Positive';
-    else if (randomValue < 0.3) return 'Negative';
-    else if (randomValue < 0.5) return 'Slightly Negative';
+    // If no model is loaded, use basic heuristic as fallback
+    console.log('No model loaded, using fallback sentiment detection');
+    const positiveCount = (cleanedText.match(/good|great|awesome|amazing|pog|love|heart|win|gg/gi) || []).length;
+    const negativeCount = (cleanedText.match(/bad|terrible|awful|horrible|sad|lose|toxic|trash|lag/gi) || []).length;
+    
+    const ratio = positiveCount / (positiveCount + negativeCount + 0.1); // Avoid division by zero
+    
+    if (ratio > 0.7) return 'Positive'; 
+    else if (ratio > 0.5) return 'Slightly Positive';
+    else if (ratio < 0.3) return 'Negative';
+    else if (ratio < 0.5) return 'Slightly Negative';
     else return 'Neutral';
+  }
+  
+  // Clean and normalize text for model prediction
+  cleanTextForPrediction(text) {
+    if (!text) return "";
+    
+    // Convert to lowercase
+    let cleaned = text.toLowerCase();
+    
+    // Remove URLs
+    cleaned = cleaned.replace(/https?:\/\/\S+/g, '');
+    
+    // Remove timestamps (patterns like "HH:MM")
+    cleaned = cleaned.replace(/\d\d:\d\d\s*/g, '');
+    
+    // Remove username prefixes (patterns like "username:")
+    cleaned = cleaned.replace(/\w+:\s*/g, '');
+    
+    // Replace multiple spaces with a single space
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    
+    return cleaned;
+  }
+  
+  // Predict sentiment using the loaded model
+  predictWithModel(text) {
+    // Make sure we have a valid model
+    if (!this.sentimentModel || !this.sentimentModel.vocabulary) {
+      console.error('Invalid or missing sentiment model');
+      return 'Neutral';
+    }
+    
+    try {
+      // Extract features using TF-IDF
+      const features = this.extractFeatures(text);
+      
+      // Make prediction using the model
+      const prediction = this.predict(features);
+      
+      return prediction;
+    } catch (e) {
+      console.error('Error during prediction:', e);
+      return 'Neutral';
+    }
+  }
+  
+  // Extract TF-IDF features from text using model vocabulary
+  extractFeatures(text) {
+    const model = this.sentimentModel;
+    const vocabulary = model.vocabulary;
+    const idf = model.idf;
+    
+    // Count term frequencies
+    const termFrequencies = {};
+    
+    // Split into words
+    const words = text.split(/\s+/);
+    
+    // Count word occurrences that exist in our vocabulary
+    for (const word of words) {
+      if (word in vocabulary) {
+        const index = vocabulary[word];
+        termFrequencies[index] = (termFrequencies[index] || 0) + 1;
+      }
+    }
+    
+    // Create feature vector (all zeros initially)
+    const features = new Array(idf.length).fill(0);
+    
+    // Fill in the TF-IDF values
+    for (const [index, count] of Object.entries(termFrequencies)) {
+      // TF-IDF = term frequency * inverse document frequency
+      features[index] = count * idf[index];
+    }
+    
+    return features;
+  }
+  
+  // Perform prediction using the logistic regression model
+  predict(features) {
+    const model = this.sentimentModel;
+    const coefficients = model.coefficients;
+    const intercept = model.intercept;
+    const classes = model.classes;
+    
+    // Binary classification case
+    if (!Array.isArray(coefficients[0])) {
+      // Calculate decision value
+      let decision = intercept[0];
+      for (let i = 0; i < features.length; i++) {
+        if (i < coefficients.length) {  // Avoid index errors
+          decision += features[i] * coefficients[i];
+        }
+      }
+      
+      // Convert to probability with sigmoid function
+      const probability = 1 / (1 + Math.exp(-decision));
+      
+      // Map to class labels
+      // For binary classification, typically classes are ordered alphabetically
+      // and positive sentiment would be the second class
+      return probability >= 0.5 ? classes[1] : classes[0];
+    } 
+    // Multi-class classification
+    else {
+      const scores = [];
+      
+      // Calculate scores for each class
+      for (let c = 0; c < classes.length; c++) {
+        let score = intercept[c];
+        const classCoef = coefficients[c];
+        
+        for (let i = 0; i < features.length && i < classCoef.length; i++) {
+          score += features[i] * classCoef[i];
+        }
+        scores.push(score);
+      }
+      
+      // Find the class with the highest score
+      const maxIndex = scores.indexOf(Math.max(...scores));
+      return classes[maxIndex];
+    }
   }
   
   // Basic placeholder for sentiment analysis
@@ -1151,16 +1381,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ success: true });
   }
   else if (request.action === 'getChatMessages') {
-    // New handler for feedback panel to get chat messages
+    // Handler for getting chat messages for individual labeling
     sendResponse({
       success: true,
-      messages: kickMoodMeter.getChatMessages(),
-      currentMood: kickMoodMeter.lastAnalyzedMood
+      messages: kickMoodMeter.getChatMessages()
     });
   }
-  else if (request.action === 'submitChatFeedback') {
-    // New handler for submitting feedback on chat mood
-    const result = kickMoodMeter.submitChatFeedback(request.overallMood);
+  else if (request.action === 'storeLabeledMessages') {
+    // Handler for storing labeled messages from popup
+    const result = kickMoodMeter.storeLabeledMessages(request.labeledMessages);
     sendResponse(result);
   }
   

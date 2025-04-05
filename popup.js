@@ -267,7 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('trainModelBtn').addEventListener('click', () => {
     document.getElementById('mainPanel').style.display = 'none';
     document.getElementById('feedbackPanel').style.display = 'block';
-    loadChatMessages();
+    startMessageLabeling();
   });
 
   // Back from feedback button
@@ -276,108 +276,359 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('mainPanel').style.display = 'block';
   });
 
-  // Submit feedback button
-  document.getElementById('submitFeedbackBtn').addEventListener('click', () => {
-    const selectedMood = document.querySelector('input[name="chatMood"]:checked');
+  // Global variables for message labeling
+  let messagesToLabel = [];
+  let currentMessageIndex = 0;
+  let labeledMessages = [];
+  let totalLabeledCount = 0;
+
+  // Function to start message labeling process
+  function startMessageLabeling() {
+    // Reset session state but keep labeled messages
+    messagesToLabel = [];
+    currentMessageIndex = 0;
     
-    if (!selectedMood) {
-      // Show error if no mood is selected
-      alert('Please select a mood for the chat');
+    // Load previously labeled messages from storage
+    chrome.storage.local.get(['labeledMessages'], (data) => {
+      // Initialize or use existing labeled messages
+      labeledMessages = data.labeledMessages || [];
+      totalLabeledCount = labeledMessages.length;
+      
+      // Load new messages from content script
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        chrome.tabs.sendMessage(tabs[0].id, { action: 'getChatMessages' }, (response) => {
+          if (response && response.success && response.messages && response.messages.length > 0) {
+            // Filter out messages that have already been labeled
+            const labeledMessageIds = new Set(labeledMessages.map(m => m.username + '|' + m.message));
+            messagesToLabel = response.messages.filter(msg => 
+              !labeledMessageIds.has(msg.username + '|' + msg.message)
+            );
+            
+            console.log(`Loaded ${messagesToLabel.length} new messages to label (filtered from ${response.messages.length} total)`);
+            
+            // Update the progress display with total previously labeled messages
+            updateProgressDisplay();
+            
+            if (messagesToLabel.length > 0) {
+              showNextMessage();
+            } else {
+              if (totalLabeledCount > 0) {
+                showEmptyState(`You have already labeled all available messages! (${totalLabeledCount} total)`);
+              } else {
+                showEmptyState('No unlabeled messages found. Try collecting chat first.');
+              }
+            }
+          } else {
+            showEmptyState();
+          }
+        });
+      });
+    });
+  }
+
+  // Show empty state when no messages are available
+  function showEmptyState(customMessage) {
+    const messageCard = document.getElementById('messageCard');
+    
+    // Default message if no custom message provided
+    const message = customMessage || 'No chat messages available';
+    const subMessage = customMessage 
+      ? (totalLabeledCount > 0 ? `You've labeled ${totalLabeledCount} messages so far` : '') 
+      : 'Try collecting chat first using the \'Collect Chat Now\' button';
+    
+    messageCard.innerHTML = `
+      <div class="empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 6 6 18"></path><path d="m6 6 12 12"></path>
+        </svg>
+        <p>${message}</p>
+        <p>${subMessage}</p>
+      </div>
+    `;
+    
+    // Hide the sentiment buttons and progress display
+    document.querySelector('.sentiment-buttons').style.display = 'none';
+    document.getElementById('labelingProgress').style.display = 'none';
+  }
+
+  // Display the next message to be labeled
+  function showNextMessage() {
+    const messageCard = document.getElementById('messageCard');
+    
+    // Check if we've reached the end
+    if (currentMessageIndex >= messagesToLabel.length) {
+      messageCard.innerHTML = `
+        <div class="empty-state">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          </svg>
+          <p>You've labeled all available messages in this batch!</p>
+          <p>${totalLabeledCount > 0 ? `Total labeled messages: ${totalLabeledCount + (labeledMessages.length - totalLabeledCount)}` : ''}</p>
+          <p>Collect more chat or export your labeled data</p>
+        </div>
+      `;
+      
+      // Hide the sentiment buttons (no more messages to label)
+      document.querySelector('.sentiment-buttons').style.display = 'none';
+      
+      // Save the most recent batch of labels to storage
+      saveLabeledMessages();
+      
       return;
     }
     
-    // Get user's selected mood
-    const moodValue = selectedMood.value;
+    // Get the current message
+    const message = messagesToLabel[currentMessageIndex];
     
-    // Send feedback to content script
+    // Final check for empty messages - if this message is empty, skip to the next one
+    if (!message.message || message.message.trim().length < 3) {
+      console.log('Skipping empty message in showNextMessage function');
+      currentMessageIndex++;
+      showNextMessage(); // Recursively call to get the next valid message
+      return;
+    }
+    
+    // Update the message card
+    messageCard.innerHTML = `
+      <div class="message-card-inner">
+        <div class="message-card-username">${escapeHtml(message.username)}</div>
+        <div class="message-card-text">${escapeHtml(message.message)}</div>
+      </div>
+    `;
+    
+    // Make sure the sentiment buttons are visible
+    document.querySelector('.sentiment-buttons').style.display = 'flex';
+  }
+
+  // Update progress display
+  function updateProgressDisplay() {
+    const progressBar = document.getElementById('progressBar');
+    const labeledCount = document.getElementById('labeledCount');
+    const totalCount = document.getElementById('totalCount');
+    
+    // For this session: current labeled messages out of total messages to label
+    const sessionLabeled = labeledMessages.length - totalLabeledCount;
+    
+    // Calculate progress percentage for current batch
+    const progress = messagesToLabel.length > 0 
+      ? (sessionLabeled / messagesToLabel.length) * 100
+      : 0;
+    
+    // Update progress bar
+    progressBar.style.width = `${progress}%`;
+    
+    // Update text display with both current session and total counts
+    labeledCount.textContent = sessionLabeled;
+    totalCount.textContent = messagesToLabel.length;
+    
+    // Add a small badge showing the total labeled messages
+    const labelingProgress = document.getElementById('labelingProgress');
+    
+    // Check if we already have a total counter and update it
+    let totalCounter = document.getElementById('totalLabeledCounter');
+    if (totalLabeledCount > 0 || sessionLabeled > 0) {
+      if (!totalCounter) {
+        totalCounter = document.createElement('div');
+        totalCounter.id = 'totalLabeledCounter';
+        totalCounter.className = 'total-labeled';
+        totalCounter.style.cssText = 'font-size: 12px; color: #aaa; text-align: center; margin-top: 5px;';
+        labelingProgress.appendChild(totalCounter);
+      }
+      
+      totalCounter.textContent = `Total labeled messages: ${totalLabeledCount + sessionLabeled}`;
+    }
+  }
+  
+  // Save labeled messages to storage
+  function saveLabeledMessages() {
+    if (labeledMessages.length <= totalLabeledCount) {
+      return; // Nothing new to save
+    }
+    
+    // Get only the newly labeled messages in this session
+    const newlyLabeledMessages = labeledMessages.slice(totalLabeledCount);
+    
+    // Save to content script storage
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       chrome.tabs.sendMessage(tabs[0].id, { 
-        action: 'submitChatFeedback',
-        overallMood: moodValue
+        action: 'storeLabeledMessages',
+        labeledMessages: newlyLabeledMessages
       }, (response) => {
         if (response && response.success) {
-          // Show success message
-          const chatContainer = document.getElementById('chatMessagesContainer');
-          chatContainer.innerHTML = '<div class="success-message">Feedback submitted successfully! Thank you for helping improve the model.</div>';
-          
-          // Get the batch text from the response
-          const batchText = response.batchText || '';
-          
-          // Store the feedback with the actual messages for training
-          storeFeedbackForTraining(moodValue, batchText, response.messages || []);
-          
-          // Reset the form
-          document.querySelectorAll('input[name="chatMood"]').forEach(radio => {
-            radio.checked = false;
-          });
-          
-          // Return to main panel after a short delay
-          setTimeout(() => {
-            document.getElementById('feedbackPanel').style.display = 'none';
-            document.getElementById('mainPanel').style.display = 'block';
-          }, 2000);
+          console.log(`Saved ${newlyLabeledMessages.length} newly labeled messages`);
+          totalLabeledCount += newlyLabeledMessages.length;
         } else {
-          alert('Failed to submit feedback. Please try again.');
-        }
-      });
-    });
-  });
-
-  // Export feedback button
-  document.getElementById('exportFeedbackBtn').addEventListener('click', () => {
-    exportTrainingData();
-  });
-
-  // Function to load chat messages
-  function loadChatMessages() {
-    const chatContainer = document.getElementById('chatMessagesContainer');
-    chatContainer.innerHTML = '<div class="loading-message">Loading chat messages...</div>';
-    
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      chrome.tabs.sendMessage(tabs[0].id, { action: 'getChatMessages' }, (response) => {
-        if (response && response.success && response.messages && response.messages.length > 0) {
-          // Display the messages
-          displayChatMessages(response.messages);
-          
-          // Pre-select the current mood if available
-          if (response.currentMood) {
-            const moodRadio = document.querySelector(`input[value="${response.currentMood}"]`);
-            if (moodRadio) {
-              moodRadio.checked = true;
-            }
-          }
-        } else {
-          chatContainer.innerHTML = '<div class="error-message">No chat messages available. Try collecting chat first.</div>';
+          console.error('Failed to save labeled messages');
         }
       });
     });
   }
 
-  // Function to display chat messages
-  function displayChatMessages(messages) {
-    const chatContainer = document.getElementById('chatMessagesContainer');
-    chatContainer.innerHTML = '';
+  // Sentiment button clicks
+  document.getElementById('btnPositive').addEventListener('click', () => {
+    labelCurrentMessage('Positive');
+  });
+  
+  document.getElementById('btnNeutral').addEventListener('click', () => {
+    labelCurrentMessage('Neutral');
+  });
+  
+  document.getElementById('btnNegative').addEventListener('click', () => {
+    labelCurrentMessage('Negative');
+  });
+  
+  // Skip button
+  document.getElementById('skipMessageBtn').addEventListener('click', () => {
+    skipCurrentMessage();
+  });
+
+  // Label the current message and move to the next
+  function labelCurrentMessage(sentiment) {
+    // Make sure we have a message to label
+    if (currentMessageIndex >= messagesToLabel.length) return;
     
-    // Only display up to 20 messages to avoid UI overload
-    const displayMessages = messages.slice(0, 20);
+    // Get the current message
+    const message = messagesToLabel[currentMessageIndex];
     
-    displayMessages.forEach(message => {
-      const messageElement = document.createElement('div');
-      messageElement.className = 'chat-message';
-      
-      messageElement.innerHTML = `
-        <div class="chat-username">${escapeHtml(message.username)}</div>
-        <div class="chat-text">${escapeHtml(message.message)}</div>
-      `;
-      
-      chatContainer.appendChild(messageElement);
+    // Last check to make sure this is actually a valid message with content
+    // If somehow an empty one got through all the filtering, we'll skip it
+    if (!message.message || message.message.trim().length < 3) {
+      console.log('Skipping empty message that passed through filters');
+      currentMessageIndex++;
+      showNextMessage();
+      return;
+    }
+    
+    // Add the labeled message to our collection
+    labeledMessages.push({
+      message: message.message,
+      username: message.username,
+      sentiment: sentiment,
+      timestamp: Date.now()
     });
     
-    // Update message count
-    const messageCount = document.createElement('div');
-    messageCount.className = 'message-count';
-    messageCount.textContent = `Showing ${displayMessages.length} of ${messages.length} total messages`;
-    chatContainer.appendChild(messageCount);
+    // Animate card based on sentiment
+    const messageCard = document.getElementById('messageCard');
+    
+    let animationClass = '';
+    if (sentiment === 'Positive') {
+      animationClass = 'swipe-right';
+    } else if (sentiment === 'Negative') {
+      animationClass = 'swipe-left';
+    } else {
+      animationClass = 'swipe-down';
+    }
+    
+    // Add animation class
+    messageCard.classList.add(animationClass);
+    
+    // After animation completes, show next message
+    setTimeout(() => {
+      messageCard.classList.remove(animationClass);
+      currentMessageIndex++;
+      updateProgressDisplay();
+      
+      // Periodically save every 10 messages
+      if ((labeledMessages.length - totalLabeledCount) % 10 === 0) {
+        saveLabeledMessages();
+      }
+      
+      showNextMessage();
+    }, 300);
+  }
+
+  // Skip current message and move to the next
+  function skipCurrentMessage() {
+    // Make sure we have a message to skip
+    if (currentMessageIndex >= messagesToLabel.length) return;
+    
+    // Animation for skipping
+    const messageCard = document.getElementById('messageCard');
+    messageCard.classList.add('swipe-down');
+    
+    // After animation completes, show next message
+    setTimeout(() => {
+      messageCard.classList.remove('swipe-down');
+      currentMessageIndex++;
+      updateProgressDisplay();
+      showNextMessage();
+    }, 300);
+  }
+
+  // Export feedback button
+  document.getElementById('exportFeedbackBtn').addEventListener('click', () => {
+    exportLabeledMessages();
+  });
+
+  // Export labeled messages to CSV
+  function exportLabeledMessages() {
+    // Make sure any recent labels are saved first
+    saveLabeledMessages();
+    
+    // Get all labeled messages from storage to ensure we export everything
+    chrome.storage.local.get(['labeledMessages'], (data) => {
+      const allLabeledMessages = data.labeledMessages || [];
+      
+      // Check if we have labeled messages
+      if (allLabeledMessages.length === 0) {
+        alert('No labeled messages to export. Please label some messages first.');
+        return;
+      }
+      
+      // Create CSV content
+      let csvContent = 'data:text/csv;charset=utf-8,';
+      
+      // Header
+      csvContent += 'message,sentiment_label\n';
+      
+      // Filter out and count empty messages before adding to CSV
+      let emptyMessageCount = 0;
+      let validMessages = 0;
+      
+      // Add each labeled message, skipping empty ones
+      allLabeledMessages.forEach(item => {
+        // Clean the message text for CSV
+        const cleanedMessage = cleanTextForTraining(item.message);
+        
+        // Skip empty messages
+        if (!cleanedMessage || cleanedMessage.trim() === '') {
+          emptyMessageCount++;
+          return;
+        }
+        
+        // Skip very short messages
+        if (cleanedMessage.trim().length < 2) {
+          emptyMessageCount++;
+          return;
+        }
+        
+        // Escape quotes in the message text
+        const escapedMessage = cleanedMessage.replace(/"/g, '""');
+        
+        // Add the row to CSV
+        csvContent += `"${escapedMessage}","${item.sentiment}"\n`;
+        validMessages++;
+      });
+      
+      console.log(`Skipped ${emptyMessageCount} empty messages during export`);
+      
+      // Create download link
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `kick_sentiment_training_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      
+      // Trigger download
+      link.click();
+      
+      // Clean up
+      document.body.removeChild(link);
+      
+      // Show confirmation of export with filter info
+      alert(`Successfully exported ${validMessages} labeled messages.\n\n${emptyMessageCount > 0 ? `(${emptyMessageCount} empty or too short messages were filtered out)` : ''}`);
+    });
   }
 
   // Helper function to escape HTML (security)
@@ -389,6 +640,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Function to clean text for model training
   function cleanTextForTraining(text) {
+    // If empty text, return empty string for easy filtering
     if (!text) return "";
     
     // Remove timestamps (patterns like "HH:MM")
@@ -403,6 +655,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Remove special characters and excessive whitespace
     cleaned = cleaned.replace(/[^\w\s]/g, " ");
     cleaned = cleaned.replace(/\s+/g, " ").trim();
+    
+    // Check if there's any actual text content left after cleaning
+    if (!cleaned || cleaned.trim().length < 2) {
+      return ""; // Return empty string for filtering
+    }
+    
+    // Check if message only contains numbers (like "123456")
+    if (/^\d+$/.test(cleaned)) {
+      return ""; // Return empty string for filtering
+    }
     
     return cleaned;
   }
@@ -539,7 +801,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       
-      // Count entries by sentiment
+      // Count entries by sentiment 
       const counts = {
         Positive: 0,
         Negative: 0,
