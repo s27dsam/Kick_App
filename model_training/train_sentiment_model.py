@@ -9,7 +9,7 @@ from sklearn.metrics import classification_report, accuracy_score
 
 # Load the data
 print("Loading and processing data...")
-df = pd.read_csv('kick_sentiment_training_test.csv')
+df = pd.read_csv('kick_sentiment_training_1743825598220.csv')
 
 # Remove any empty messages
 df = df[~(df['message'].isna() | (df['message'] == ''))]
