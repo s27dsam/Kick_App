@@ -22,7 +22,8 @@ class NumpyEncoder(json.JSONEncoder):
 
 # Define input and output files
 MODEL_PATH = 'sentiment_model.pkl'
-OUTPUT_PATH = 'sentiment_model.json'
+# needs to be in the same path as the manifet.json file.
+OUTPUT_PATH = '/Users/sam/Developer/Projects/Kick_App/sentiment_model.json'
 
 print(f"Loading model from {MODEL_PATH}...")
 
