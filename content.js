@@ -455,7 +455,6 @@ class KickMoodMeter {
       .slice(0, 100); // Keep top 100 words
   }
 
-  // In content.js, update the analyzeMood method to use batch analysis
   analyzeMood(messages) {
     // Reset counts for this analysis
     this.resetSentimentCounts();
@@ -468,30 +467,49 @@ class KickMoodMeter {
     // Combine all messages into a single batch of text
     const batchText = messages.map(msg => msg.message).join(' ');
     
-    // Analyze the entire batch as one unit using the sentiment model
+    // Analyze the entire batch using the sentiment model
     const batchSentiment = this.analyzeBatchSentiment(batchText);
     
-    // Based on the batch sentiment, determine mood
+    // Updated sentiment counting logic for more balanced results
     let moodObj;
+    
     if (batchSentiment === 'Positive') {
-      this.sentimentCounts.positive += 3; // Strongly positive
+      this.sentimentCounts.positive += Math.ceil(totalMessages * 0.7);
+      this.sentimentCounts.neutral += Math.ceil(totalMessages * 0.2);
+      this.sentimentCounts.negative += Math.ceil(totalMessages * 0.1);
       moodObj = { mood: 'HYPE 🔥', level: 0 };
-    } else if (batchSentiment === 'Slightly Positive') {
-      this.sentimentCounts.positive += 1;
-      moodObj = { mood: 'Slightly Positive 🙂', level: 2 };
-    } else if (batchSentiment === 'Negative') {
-      this.sentimentCounts.negative += 3; // Strongly negative
+    } 
+    else if (batchSentiment === 'Slightly Positive') {
+      this.sentimentCounts.positive += Math.ceil(totalMessages * 0.55);
+      this.sentimentCounts.neutral += Math.ceil(totalMessages * 0.35);
+      this.sentimentCounts.negative += Math.ceil(totalMessages * 0.1);
+      moodObj = { mood: 'Positive 🙂', level: 1 };
+    }
+    else if (batchSentiment === 'Negative') {
+      this.sentimentCounts.negative += Math.ceil(totalMessages * 0.7);
+      this.sentimentCounts.neutral += Math.ceil(totalMessages * 0.2);
+      this.sentimentCounts.positive += Math.ceil(totalMessages * 0.1);
       moodObj = { mood: 'TOXIC 🤬', level: 4 };
-    } else if (batchSentiment === 'Slightly Negative') {
-      this.sentimentCounts.negative += 1;
-      moodObj = { mood: 'Slightly Negative 😕', level: 2 };
-    } else {
-      this.sentimentCounts.neutral += 1;
-      moodObj = { mood: 'Neutral 😐', level: 1 };
+    } 
+    else if (batchSentiment === 'Slightly Negative') {
+      this.sentimentCounts.negative += Math.ceil(totalMessages * 0.55);
+      this.sentimentCounts.neutral += Math.ceil(totalMessages * 0.35);
+      this.sentimentCounts.positive += Math.ceil(totalMessages * 0.1);
+      moodObj = { mood: 'Negative 😕', level: 3 };
+    } 
+    else {
+      this.sentimentCounts.neutral += Math.ceil(totalMessages * 0.6);
+      this.sentimentCounts.positive += Math.ceil(totalMessages * 0.2);
+      this.sentimentCounts.negative += Math.ceil(totalMessages * 0.2);
+      moodObj = { mood: 'Neutral 😐', level: 2 };
     }
     
     console.log('Batch sentiment:', batchSentiment);
+    console.log('Updated sentiment counts:', this.sentimentCounts);
     console.log('Mood interpretation:', moodObj);
+    
+    // Calculate mood stats for consistency
+    this.calculateMoodStats();
     
     // Store the last analyzed mood for feedback
     this.lastAnalyzedMood = moodObj.mood;
@@ -499,7 +517,6 @@ class KickMoodMeter {
     return moodObj;
   }
 
-  // Method to analyze sentiment of the entire batch using the trained model
   analyzeBatchSentiment(batchText) {
     // Clean and prepare the text
     const cleanedText = this.cleanTextForPrediction(batchText);
@@ -517,18 +534,43 @@ class KickMoodMeter {
       }
     }
     
-    // If no model is loaded, use basic heuristic as fallback
-    console.log('No model loaded, using fallback sentiment detection');
-    const positiveCount = (cleanedText.match(/good|great|awesome|amazing|pog|love|heart|win|gg/gi) || []).length;
-    const negativeCount = (cleanedText.match(/bad|terrible|awful|horrible|sad|lose|toxic|trash|lag/gi) || []).length;
+    // Updated fallback heuristic with more balanced detection
+    console.log('No model loaded, using improved fallback sentiment detection');
     
-    const ratio = positiveCount / (positiveCount + negativeCount + 0.1); // Avoid division by zero
+    // Count various sentiment indicators
+    const positiveCount = (cleanedText.match(/good|great|awesome|amazing|pog|love|heart|win|gg|lol|haha|nice|thanks|ty|cool|wow/gi) || []).length;
+    const negativeCount = (cleanedText.match(/bad|terrible|awful|horrible|sad|lose|toxic|trash|lag|wtf|hate|fail|damn|shit|fuck|sucks/gi) || []).length;
     
-    if (ratio > 0.7) return 'Positive'; 
-    else if (ratio > 0.5) return 'Slightly Positive';
-    else if (ratio < 0.3) return 'Negative';
-    else if (ratio < 0.5) return 'Slightly Negative';
-    else return 'Neutral';
+    // Count neutral/ambiguous words to better detect neutral sentiment
+    const neutralCount = (cleanedText.match(/ok|okay|fine|maybe|hmm|idk|what|who|when|where|why|how|if|then/gi) || []).length;
+    
+    // Calculate word count estimate for scaling (simple approximation)
+    const wordCount = cleanedText.split(/\s+/).length;
+    
+    // Calculate ratios
+    const positiveRatio = positiveCount / (wordCount || 1);
+    const negativeRatio = negativeCount / (wordCount || 1);
+    const neutralRatio = neutralCount / (wordCount || 1);
+    
+    console.log('Sentiment ratios:', {
+      positive: positiveRatio,
+      negative: negativeRatio,
+      neutral: neutralRatio,
+      wordCount
+    });
+    
+    // More nuanced sentiment classification
+    if (positiveRatio > 0.1 && positiveRatio > negativeRatio * 2) {
+      return 'Positive';
+    } else if (positiveRatio > 0.05 && positiveRatio > negativeRatio) {
+      return 'Slightly Positive';
+    } else if (negativeRatio > 0.1 && negativeRatio > positiveRatio * 2) {
+      return 'Negative';
+    } else if (negativeRatio > 0.05 && negativeRatio > positiveRatio) {
+      return 'Slightly Negative';
+    } else {
+      return 'Neutral';
+    }
   }
   
   // Clean and normalize text for model prediction
@@ -686,19 +728,38 @@ class KickMoodMeter {
     return { mood: 'Neutral', level: 2 };
   }
 
+// 5. Modified calculateMoodStats to ensure percentages are properly normalized
   calculateMoodStats() {
     // Calculate percentages
     const total = this.sentimentCounts.positive + this.sentimentCounts.neutral + this.sentimentCounts.negative;
+    
     if (total > 0) {
-      this.moodStats.positive = (this.sentimentCounts.positive / total) * 100;
-      this.moodStats.neutral = (this.sentimentCounts.neutral / total) * 100;
-      this.moodStats.negative = (this.sentimentCounts.negative / total) * 100;
+      // Round to whole numbers
+      this.moodStats.positive = Math.round((this.sentimentCounts.positive / total) * 100);
+      this.moodStats.neutral = Math.round((this.sentimentCounts.neutral / total) * 100);
+      this.moodStats.negative = Math.round((this.sentimentCounts.negative / total) * 100);
+      
+      // Ensure the total is exactly 100%
+      const sumPercent = this.moodStats.positive + this.moodStats.neutral + this.moodStats.negative;
+      
+      if (sumPercent !== 100) {
+        // Adjust the largest value to make sum exactly 100
+        if (this.moodStats.positive >= this.moodStats.neutral && this.moodStats.positive >= this.moodStats.negative) {
+          this.moodStats.positive += (100 - sumPercent);
+        } else if (this.moodStats.neutral >= this.moodStats.positive && this.moodStats.neutral >= this.moodStats.negative) {
+          this.moodStats.neutral += (100 - sumPercent);
+        } else {
+          this.moodStats.negative += (100 - sumPercent);
+        }
+      }
     } else {
       // Default values if no messages
       this.moodStats.positive = 0;
       this.moodStats.neutral = 100;
       this.moodStats.negative = 0;
     }
+    
+    console.log('Updated mood stats:', this.moodStats);
     
     // Send the updated stats to the popup if it's open
     chrome.runtime.sendMessage({
@@ -718,16 +779,16 @@ class KickMoodMeter {
 
   getExplanation(moodObj) {
     const explanations = {
-      'HYPE': 'Chat is extremely excited and engaged!',
-      'Positive': 'Viewers are feeling good and supportive.',
-      'Slightly Positive': 'Overall pleasant atmosphere.',
-      'Neutral': 'Chat is calm and balanced.',
-      'Slightly Negative': 'Some tension or mild frustration.',
-      'Negative': 'Chat is getting upset or critical.',
-      'TOXIC': 'High negativity and potential conflict!',
+      'HYPE 🔥': 'Chat is extremely excited and positive!',
+      'Positive 🙂': 'Chat has a positive and supportive atmosphere.',
+      'Slightly Positive 🙂': 'Chat shows more positive than negative sentiment.',
+      'Neutral 😐': 'Chat is balanced with mixed or neutral messages.',
+      'Slightly Negative 😕': 'Chat shows some negativity or criticism.',
+      'Negative 😕': 'Chat has a negative tone with criticism.',
+      'TOXIC 🤬': 'Chat has high negativity and potential conflict!',
       'Waiting for chat...': 'Collecting messages...'
     };
-
+  
     return explanations[moodObj.mood] || 'Analyzing chat mood...';
   }
 
@@ -920,14 +981,14 @@ class KickMoodMeter {
     
     // Analyze the collected messages
     const moodObj = this.analyzeMood(this.chatHistory);
-    // Calculate and update mood statistics for popup
-    this.calculateMoodStats();
+    
+    // Calculate mood statistics for popup (already called in analyzeMood)
     const explanation = this.getExplanation(moodObj);
     
     // Update the widget with results
     this.createOrUpdateWidget(moodObj, explanation);
     
-    // Send to popup as well - INCLUDE MESSAGE COUNT HERE
+    // Send to popup with consistent mood information
     chrome.runtime.sendMessage({ 
       action: "updateMood",
       mood: moodObj.mood, 
@@ -942,6 +1003,7 @@ class KickMoodMeter {
     const updateFrequencyMs = parseInt(this.settings.updateFrequency) * 60 * 1000 || 300000; // Default to 5 minutes
     setTimeout(() => this.startCollection(), updateFrequencyMs);
   }
+  
   
   updateChannelInfo() {
     const widget = document.getElementById('kick-mood-widget');

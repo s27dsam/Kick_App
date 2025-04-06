@@ -141,12 +141,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('trainModelBtn').style.opacity = 0.5;
   }
   
-  // Function to update the mood statistics display
   function updateMoodStats(moodStats) {
-    // Format percentages
-    const positive = Math.round(moodStats.positive);
-    const neutral = Math.round(moodStats.neutral);
-    const negative = Math.round(moodStats.negative);
+    // Make sure we have valid percentages
+    const positive = Math.round(moodStats.positive) || 0;
+    const neutral = Math.round(moodStats.neutral) || 0;
+    const negative = Math.round(moodStats.negative) || 0;
+    
+    console.log('Updating mood stats in popup:', { positive, neutral, negative });
     
     // Update progress bars
     document.getElementById('positiveBar').style.width = `${positive}%`;
@@ -158,29 +159,32 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('neutralValue').textContent = `${neutral}%`;
     document.getElementById('negativeValue').textContent = `${negative}%`;
     
-    // Determine overall mood
+    // Determine overall mood more accurately based on percentages
     let overallMood = "Neutral";
-    if (positive > neutral && positive > negative) {
-      overallMood = "Positive";
-    } else if (negative > neutral && negative > positive) {
-      overallMood = "Negative";
+    
+    // Only change from neutral if there's a significant difference
+    if (positive > neutral + 10 && positive > negative + 10) {
+      overallMood = positive > 65 ? "HYPE" : "Positive";
+    } else if (negative > neutral + 10 && negative > positive + 10) {
+      overallMood = negative > 65 ? "TOXIC" : "Negative";
     }
     
     // Update overall mood text with color coding
     const overallMoodElement = document.getElementById('overallMoodValue');
-    overallMoodElement.textContent = overallMood;
-    
-    // Apply color coding to overall mood
-    if (overallMood === "Positive") {
-      overallMoodElement.style.color = "#4caf50";
-    } else if (overallMood === "Negative") {
-      overallMoodElement.style.color = "#f44336";
-    } else {
-      overallMoodElement.style.color = "#2196f3";
+    if (overallMoodElement) {
+      overallMoodElement.textContent = overallMood;
+      
+      // Apply color coding to overall mood
+      if (overallMood === "HYPE" || overallMood === "Positive") {
+        overallMoodElement.style.color = "#4caf50";
+      } else if (overallMood === "TOXIC" || overallMood === "Negative") {
+        overallMoodElement.style.color = "#f44336";
+      } else {
+        overallMoodElement.style.color = "#2196f3";
+      }
     }
   }
   
-  // Set up message listener to receive updates from content script
   chrome.runtime.onMessage.addListener((message) => {
     if (message.action === "updateMoodStats" && message.moodStats) {
       updateMoodStats(message.moodStats);
@@ -197,16 +201,19 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('messageCount').textContent = `Messages analyzed: ${message.messageCount}`;
       }
       
-      // Update overall mood display if available
+      // Update overall mood display directly from message data
+      // This ensures consistency with the widget
       if (message.mood) {
         const overallMoodElement = document.getElementById('overallMoodValue');
         if (overallMoodElement) {
-          overallMoodElement.textContent = message.mood;
+          // Extract the mood text without emoji
+          const moodText = message.mood.split(' ')[0];
+          overallMoodElement.textContent = moodText;
           
-          // Apply color coding
-          if (message.mood.includes('Positive') || message.mood.includes('HYPE')) {
+          // Apply appropriate color coding
+          if (moodText.includes('HYPE') || moodText.includes('Positive')) {
             overallMoodElement.style.color = "#4caf50";
-          } else if (message.mood.includes('Negative') || message.mood.includes('TOXIC')) {
+          } else if (moodText.includes('TOXIC') || moodText.includes('Negative')) {
             overallMoodElement.style.color = "#f44336";
           } else {
             overallMoodElement.style.color = "#2196f3";
@@ -216,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Collect Now button functionality
+  // Collect Chat Now button functionality
   document.getElementById('collectNowBtn').addEventListener('click', function() {
     // Update button state
     const button = document.getElementById('collectNowBtn');
@@ -242,13 +249,15 @@ document.addEventListener('DOMContentLoaded', () => {
           
           // Update overall mood display based on the response
           const overallMoodElement = document.getElementById('overallMoodValue');
-          if (overallMoodElement) {
-            overallMoodElement.textContent = response.mood || 'Neutral';
+          if (overallMoodElement && response.mood) {
+            // Extract the mood text without emoji
+            const moodText = response.mood.split(' ')[0];
+            overallMoodElement.textContent = moodText;
             
             // Apply color coding
-            if (response.mood && (response.mood.includes('Positive') || response.mood.includes('HYPE'))) {
+            if (moodText.includes('HYPE') || moodText.includes('Positive')) {
               overallMoodElement.style.color = "#4caf50";
-            } else if (response.mood && (response.mood.includes('Negative') || response.mood.includes('TOXIC'))) {
+            } else if (moodText.includes('TOXIC') || moodText.includes('Negative')) {
               overallMoodElement.style.color = "#f44336";
             } else {
               overallMoodElement.style.color = "#2196f3";
