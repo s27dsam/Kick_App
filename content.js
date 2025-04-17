@@ -772,9 +772,50 @@ class KickMoodMeter {
 
   getMoodLevelPercentage(level) {
     // Convert mood level (0-4) to a percentage position (0-100%) for the arrow
+    // This is the old approach that makes it too extreme:
     // 0 = leftmost (most positive), 4 = rightmost (most negative)
     // Each level is 20% of the width (5 levels total)
-    return level * 20 + 9; // +9 to center within each segment
+    // return level * 20 + 9; // +9 to center within each segment
+    
+    // New more nuanced approach using actual percentages:
+    // First, get the mood stats
+    const positivePercent = this.moodStats.positive || 0;
+    const negativePercent = this.moodStats.negative || 0;
+    const neutralPercent = this.moodStats.neutral || 0;
+    
+    console.log('Percentages for arrow positioning:', {
+      positivePercent, 
+      neutralPercent, 
+      negativePercent,
+      level
+    });
+    
+    // Calculate arrow position based on sentiment percentages, not just the level
+    // We'll use a weighted calculation that considers the distribution of sentiments
+    // This will make the arrow position more proportional to the actual sentiment
+    
+    // Start from the middle (50%)
+    let position = 50;
+    
+    // Adjust based on positive/negative distributions
+    // If there's more positive than negative, move left (towards positive)
+    // If there's more negative than positive, move right (towards negative)
+    const sentimentDifference = positivePercent - negativePercent;
+    
+    // Scale the difference to a maximum movement of 40 percentage points
+    // This keeps the arrow within reasonable bounds and prevents extremes
+    const maxDisplacement = 40;
+    const scaledDifference = (sentimentDifference / 100) * maxDisplacement;
+    
+    // Move position (negative number moves left toward positive, positive moves right toward negative)
+    position -= scaledDifference;
+    
+    // Ensure position stays within bounds (10-90%)
+    position = Math.max(10, Math.min(90, position));
+    
+    console.log('Calculated arrow position:', position);
+    
+    return position;
   }
 
   getExplanation(moodObj) {
